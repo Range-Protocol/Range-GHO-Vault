@@ -43,32 +43,30 @@ contract RangeProtocolVault is
             address _gho,
             address _poolAddressesProvider
         ) = abi.decode(data, (address, string, string, address, address));
-
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Ownable_init();
         __ERC20_init(_name, _symbol);
         __Pausable_init();
-
         _transferOwnership(manager);
 
         state.poolData.pool = IUniswapV3Pool(_pool);
-        state.poolData.token0 = IERC20Upgradeable(state.poolData.pool.token0());
-        state.poolData.token1 = IERC20Upgradeable(state.poolData.pool.token1());
+        IERC20Upgradeable token0 = IERC20Upgradeable(state.poolData.pool.token0());
+        IERC20Upgradeable token1 = IERC20Upgradeable(state.poolData.pool.token1());
+        state.poolData.token0 = token0;
+        state.poolData.token1 = token1;
         state.poolData.tickSpacing = _tickSpacing;
         state.poolData.factory = msg.sender;
-
-        state.poolData.decimals0 = IERC20MetadataUpgradeable(address(state.poolData.token0)).decimals();
-        state.poolData.decimals1 = IERC20MetadataUpgradeable(address(state.poolData.token1)).decimals();
-
+        state.poolData.decimals0 = IERC20MetadataUpgradeable(address(token0)).decimals();
+        state.poolData.decimals1 = IERC20MetadataUpgradeable(address(token1)).decimals();
         state.aaveData.poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
-        if (address(state.poolData.token0) == _gho) {
+        if (address(token0) == _gho) {
             state.poolData.isToken0GHO = true;
-            state.aaveData.gho = state.poolData.token0;
-            state.aaveData.collateralToken = state.poolData.token1;
+            state.aaveData.gho = token0;
+            state.aaveData.collateralToken = token1;
         } else {
-            state.aaveData.gho = state.poolData.token1;
-            state.aaveData.collateralToken = state.poolData.token0;
+            state.aaveData.gho = token1;
+            state.aaveData.collateralToken = token0;
         }
         // Managing fee is 0% at the time vault initialization.
         LogicLib.updateFees(state.feeData, 0, 250);

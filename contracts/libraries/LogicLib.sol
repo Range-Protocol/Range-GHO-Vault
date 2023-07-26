@@ -215,7 +215,6 @@ library LogicLib {
         uint256 tokenAmount = feeData.managerBalanceToken;
         feeData.managerBalanceGHO = 0;
         feeData.managerBalanceToken = 0;
-
         (IERC20Upgradeable gho, IERC20Upgradeable token) = poolData.isToken0GHO
             ? (poolData.token0, poolData.token1)
             : (poolData.token1, poolData.token0);
@@ -252,14 +251,16 @@ library LogicLib {
     }
 
     function mintGHO(DataTypesLib.AaveData storage aaveData, uint256 mintAmount) external {
-        IPool(aaveData.poolAddressesProvider.getPool()).borrow(address(aaveData.gho), mintAmount, 2, 0, address(this));
+        uint256 interestRateMode = 2; // open debt at a variable rate
+        IPool(aaveData.poolAddressesProvider.getPool()).borrow(address(aaveData.gho), mintAmount, interestRateMode, 0, address(this));
         emit GHOMinted(mintAmount);
     }
 
     function burnGHO(DataTypesLib.AaveData storage aaveData, uint256 burnAmount) external {
         IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
         aaveData.gho.approve(address(aavePool), burnAmount);
-        aavePool.repay(address(aaveData.gho), burnAmount, 2, address(this));
+        uint256 interestRateMode = 2; // remove debt opened at a variable rate.
+        aavePool.repay(address(aaveData.gho), burnAmount, interestRateMode, address(this));
         emit GHOBurned(burnAmount);
     }
 
