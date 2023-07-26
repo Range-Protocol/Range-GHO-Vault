@@ -78,10 +78,7 @@ interface IRangeProtocolVault is
 
     function getPositionID() external view returns (bytes32 positionID);
 
-    function getUserVaults(
-        uint256 fromIdx,
-        uint256 toIdx
-    ) external view returns (DataTypesLib.UserVaultInfo[] memory);
+    function getUserVaults(uint256 fromIdx, uint256 toIdx) external view returns (DataTypesLib.UserVaultInfo[] memory);
 
     function supplyCollateral(uint256 supplyAmount) external;
 

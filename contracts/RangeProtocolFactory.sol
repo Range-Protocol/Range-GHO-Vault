@@ -15,8 +15,7 @@ import {FactoryErrors} from "./errors/FactoryErrors.sol";
  * Owner can deploy and upgrade vault contracts.
  */
 contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
-    bytes4 public constant INIT_SELECTOR =
-        bytes4(keccak256(bytes("initialize(address,int24,bytes)")));
+    bytes4 public constant INIT_SELECTOR = bytes4(keccak256(bytes("initialize(address,int24,bytes)")));
 
     bytes4 public constant UPGRADE_SELECTOR = bytes4(keccak256(bytes("upgradeTo(address)")));
 
@@ -56,10 +55,7 @@ contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
      * @param _vaults list of vaults to upgrade
      * @param _impls new implementation contracts of corresponding vaults
      */
-    function upgradeVaults(
-        address[] calldata _vaults,
-        address[] calldata _impls
-    ) external override onlyOwner {
+    function upgradeVaults(address[] calldata _vaults, address[] calldata _impls) external override onlyOwner {
         if (_vaults.length != _impls.length) revert FactoryErrors.MismatchedVaultsAndImplsLength();
 
         for (uint256 i = 0; i < _vaults.length; i++) {
@@ -83,10 +79,7 @@ contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
      * @param endIdx the index in vaults to end retrieval from.
      * @return vaultList list of fetched vault addresses
      */
-    function getVaultAddresses(
-        uint256 startIdx,
-        uint256 endIdx
-    ) external view returns (address[] memory vaultList) {
+    function getVaultAddresses(uint256 startIdx, uint256 endIdx) external view returns (address[] memory vaultList) {
         vaultList = new address[](endIdx - startIdx + 1);
         for (uint256 i = startIdx; i <= endIdx; i++) {
             vaultList[i] = _vaultsList[i];
@@ -117,10 +110,7 @@ contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
 
         int24 tickSpacing = IUniswapV3Factory(factory).feeAmountTickSpacing(fee);
         vault = address(
-            new ERC1967Proxy(
-                implementation,
-                abi.encodeWithSelector(INIT_SELECTOR, pool, tickSpacing, data)
-            )
+            new ERC1967Proxy(implementation, abi.encodeWithSelector(INIT_SELECTOR, pool, tickSpacing, data))
         );
         _vaultsList.push(vault);
     }

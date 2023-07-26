@@ -11,21 +11,10 @@ contract SwapTest is IUniswapV3SwapCallback {
         uint160 nextSqrtRatio = sqrtRatio +
             uint160(uint160(uint256(amountSpecified) * 2 ** 96) / IUniswapV3Pool(pool).liquidity());
 
-        IUniswapV3Pool(pool).swap(
-            address(msg.sender),
-            false,
-            amountSpecified,
-            nextSqrtRatio,
-            abi.encode(msg.sender)
-        );
+        IUniswapV3Pool(pool).swap(address(msg.sender), false, amountSpecified, nextSqrtRatio, abi.encode(msg.sender));
     }
 
-    function washTrade(
-        address pool,
-        int256 amountSpecified,
-        uint256 numTrades,
-        uint256 ratio
-    ) external {
+    function washTrade(address pool, int256 amountSpecified, uint256 numTrades, uint256 ratio) external {
         for (uint256 i = 0; i < numTrades; i++) {
             bool zeroForOne = i % ratio > 0;
             (uint160 sqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -56,25 +45,13 @@ contract SwapTest is IUniswapV3SwapCallback {
         (nextSqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
     }
 
-    function uniswapV3SwapCallback(
-        int256 amount0Delta,
-        int256 amount1Delta,
-        bytes calldata data
-    ) external override {
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
         address sender = abi.decode(data, (address));
 
         if (amount0Delta > 0) {
-            IERC20(IUniswapV3Pool(msg.sender).token0()).transferFrom(
-                sender,
-                msg.sender,
-                uint256(amount0Delta)
-            );
+            IERC20(IUniswapV3Pool(msg.sender).token0()).transferFrom(sender, msg.sender, uint256(amount0Delta));
         } else if (amount1Delta > 0) {
-            IERC20(IUniswapV3Pool(msg.sender).token1()).transferFrom(
-                sender,
-                msg.sender,
-                uint256(amount1Delta)
-            );
+            IERC20(IUniswapV3Pool(msg.sender).token1()).transferFrom(sender, msg.sender, uint256(amount1Delta));
         }
     }
 }

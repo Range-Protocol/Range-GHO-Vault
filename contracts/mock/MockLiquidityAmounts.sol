@@ -35,14 +35,7 @@ contract MockLiquidityAmounts {
         uint256 amount0,
         uint256 amount1
     ) public pure returns (uint128 liquidity) {
-        return
-            LiquidityAmounts.getLiquidityForAmounts(
-                sqrtRatioX96,
-                sqrtRatioAX96,
-                sqrtRatioBX96,
-                amount0,
-                amount1
-            );
+        return LiquidityAmounts.getLiquidityForAmounts(sqrtRatioX96, sqrtRatioAX96, sqrtRatioBX96, amount0, amount1);
     }
 
     /// @notice Computes the amount of token0 for a given amount of liquidity and a price range
@@ -79,12 +72,6 @@ contract MockLiquidityAmounts {
         uint160 sqrtRatioBX96,
         uint128 liquidity
     ) public pure returns (uint256 amount0, uint256 amount1) {
-        return
-            LiquidityAmounts.getAmountsForLiquidity(
-                sqrtRatioX96,
-                sqrtRatioAX96,
-                sqrtRatioBX96,
-                liquidity
-            );
+        return LiquidityAmounts.getAmountsForLiquidity(sqrtRatioX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
     }
 }

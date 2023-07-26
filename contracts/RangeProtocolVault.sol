@@ -35,11 +35,7 @@ contract RangeProtocolVault is
         _disableInitializers();
     }
 
-    function initialize(
-        address _pool,
-        int24 _tickSpacing,
-        bytes memory data
-    ) external override initializer {
+    function initialize(address _pool, int24 _tickSpacing, bytes memory data) external override initializer {
         (
             address manager,
             string memory _name,
@@ -62,10 +58,8 @@ contract RangeProtocolVault is
         state.poolData.tickSpacing = _tickSpacing;
         state.poolData.factory = msg.sender;
 
-        state.poolData.decimals0 = IERC20MetadataUpgradeable(address(state.poolData.token0))
-            .decimals();
-        state.poolData.decimals1 = IERC20MetadataUpgradeable(address(state.poolData.token1))
-            .decimals();
+        state.poolData.decimals0 = IERC20MetadataUpgradeable(address(state.poolData.token0)).decimals();
+        state.poolData.decimals1 = IERC20MetadataUpgradeable(address(state.poolData.token1)).decimals();
 
         state.aaveData.poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
         if (address(state.poolData.token0) == _gho) {
@@ -76,7 +70,6 @@ contract RangeProtocolVault is
             state.aaveData.gho = state.poolData.token1;
             state.aaveData.collateralToken = state.poolData.token0;
         }
-
         // Managing fee is 0% at the time vault initialization.
         LogicLib.updateFees(state.feeData, 0, 250);
     }
@@ -101,39 +94,20 @@ contract RangeProtocolVault is
         _burn(from, shares);
     }
 
-    function uniswapV3MintCallback(
-        uint256 amount0Owed,
-        uint256 amount1Owed,
-        bytes calldata
-    ) external override {
+    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata) external override {
         LogicLib.uniswapV3MintCallback(state.poolData, amount0Owed, amount1Owed);
     }
 
-    function uniswapV3SwapCallback(
-        int256 amount0Delta,
-        int256 amount1Delta,
-        bytes calldata
-    ) external override {
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata) external override {
         LogicLib.uniswapV3SwapCallback(state.poolData, amount0Delta, amount1Delta);
     }
 
-    function mint(
-        uint256 amount
-    ) external override nonReentrant whenNotPaused returns (uint256 shares) {
+    function mint(uint256 amount) external override nonReentrant whenNotPaused returns (uint256 shares) {
         return LogicLib.mint(state.poolData, state.feeData, state.userData, state.aaveData, amount);
     }
 
-    function burn(
-        uint256 burnAmount
-    ) external override nonReentrant whenNotPaused returns (uint256 withdrawAmount) {
-        return
-            LogicLib.burn(
-                state.poolData,
-                state.feeData,
-                state.userData,
-                state.aaveData,
-                burnAmount
-            );
+    function burn(uint256 burnAmount) external override nonReentrant whenNotPaused returns (uint256 withdrawAmount) {
+        return LogicLib.burn(state.poolData, state.feeData, state.userData, state.aaveData, burnAmount);
     }
 
     function removeLiquidity() external override onlyManager {
@@ -165,10 +139,7 @@ contract RangeProtocolVault is
         LogicLib.collectManager(state.poolData, state.feeData, manager());
     }
 
-    function updateFees(
-        uint16 newManagingFee,
-        uint16 newPerformanceFee
-    ) external override onlyManager {
+    function updateFees(uint16 newManagingFee, uint16 newPerformanceFee) external override onlyManager {
         LogicLib.updateFees(state.feeData, newManagingFee, newPerformanceFee);
     }
 
@@ -222,16 +193,8 @@ contract RangeProtocolVault is
         return LogicLib.getUnderlyingBalance(state.poolData, state.feeData, state.aaveData);
     }
 
-    function getUnderlyingBalanceByShare(
-        uint256 shares
-    ) external view override returns (uint256 amount) {
-        return
-            LogicLib.getUnderlyingBalanceByShare(
-                state.poolData,
-                state.feeData,
-                state.aaveData,
-                shares
-            );
+    function getUnderlyingBalanceByShare(uint256 shares) external view override returns (uint256 amount) {
+        return LogicLib.getUnderlyingBalanceByShare(state.poolData, state.feeData, state.aaveData, shares);
     }
 
     function _authorizeUpgrade(address) internal override {

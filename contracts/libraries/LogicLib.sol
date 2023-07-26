@@ -46,11 +46,7 @@ library LogicLib {
     event GHOMinted(uint256 amount);
     event GHOBurned(uint256 amount);
 
-    function updateTicks(
-        DataTypesLib.PoolData storage poolData,
-        int24 _lowerTick,
-        int24 _upperTick
-    ) external {
+    function updateTicks(DataTypesLib.PoolData storage poolData, int24 _lowerTick, int24 _upperTick) external {
         if (IRangeProtocolVault(address(this)).totalSupply() != 0 || poolData.inThePosition)
             revert VaultErrors.NotAllowedToUpdateTicks();
         _validateTicks(_lowerTick, _upperTick, poolData.tickSpacing);
@@ -61,14 +57,9 @@ library LogicLib {
     }
 
     function _validateTicks(int24 _lowerTick, int24 _upperTick, int24 tickSpacing) private pure {
-        if (_lowerTick < TickMath.MIN_TICK || _upperTick > TickMath.MAX_TICK)
-            revert VaultErrors.TicksOutOfRange();
-
-        if (
-            _lowerTick >= _upperTick ||
-            _lowerTick % tickSpacing != 0 ||
-            _upperTick % tickSpacing != 0
-        ) revert VaultErrors.InvalidTicksSpacing();
+        if (_lowerTick < TickMath.MIN_TICK || _upperTick > TickMath.MAX_TICK) revert VaultErrors.TicksOutOfRange();
+        if (_lowerTick >= _upperTick || _lowerTick % tickSpacing != 0 || _upperTick % tickSpacing != 0)
+            revert VaultErrors.InvalidTicksSpacing();
     }
 
     function uniswapV3MintCallback(
@@ -98,26 +89,22 @@ library LogicLib {
         DataTypesLib.AaveData storage aaveData,
         uint256 amount
     ) external returns (uint256 shares) {
-        IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
+        IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
-
-        if (totalSupply > 0) {
+        if (totalSupply != 0) {
             uint256 totalAmount = getUnderlyingBalance(poolData, feeData, aaveData);
             shares = FullMath.mulDivRoundingUp(amount, totalSupply, totalAmount);
         } else {
             shares = amount;
         }
         vault.mintShares(msg.sender, shares);
-
         if (!userData.vaults[msg.sender].exists) {
             userData.vaults[msg.sender].exists = true;
             userData.users.push(msg.sender);
         }
-
         userData.vaults[msg.sender].token += amount;
         aaveData.collateralToken.safeTransferFrom(msg.sender, address(this), amount);
-
         emit Minted(msg.sender, shares, amount);
     }
 
@@ -128,15 +115,14 @@ library LogicLib {
         DataTypesLib.AaveData storage aaveData,
         uint256 shares
     ) external returns (uint256 withdrawAmount) {
-        IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
+        IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         uint256 balanceBefore = vault.balanceOf(msg.sender);
         vault.burnShares(msg.sender, shares);
 
         uint256 totalAmount = getUnderlyingBalance(poolData, feeData, aaveData);
         withdrawAmount = FullMath.mulDiv(shares, totalAmount, totalSupply);
-
         _applyManagingFee(feeData, withdrawAmount);
         withdrawAmount = _netManagingFees(feeData, withdrawAmount);
 
@@ -144,7 +130,6 @@ library LogicLib {
             (userData.vaults[msg.sender].token * (balanceBefore - shares)) /
             balanceBefore;
         aaveData.collateralToken.safeTransfer(msg.sender, withdrawAmount);
-
         emit Burned(msg.sender, shares, withdrawAmount);
     }
 
@@ -154,16 +139,9 @@ library LogicLib {
         DataTypesLib.AaveData storage aaveData
     ) external {
         (uint128 liquidity, , , , ) = poolData.pool.positions(getPositionID(poolData));
-
-        if (liquidity > 0) {
-            int24 _lowerTick = poolData.lowerTick;
-            int24 _upperTick = poolData.upperTick;
-            (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) = _withdraw(
-                poolData,
-                liquidity
-            );
-
-            emit LiquidityRemoved(liquidity, _lowerTick, _upperTick, amount0, amount1);
+        if (liquidity != 0) {
+            (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) = _withdraw(poolData, liquidity);
+            emit LiquidityRemoved(liquidity, poolData.lowerTick, poolData.upperTick, amount0, amount1);
 
             _applyPerformanceFee(poolData, feeData, aaveData, fee0, fee1);
             (fee0, fee1) = _netPerformanceFees(feeData, fee0, fee1);
@@ -181,14 +159,7 @@ library LogicLib {
         int256 swapAmount,
         uint160 sqrtPriceLimitX96
     ) external returns (int256 amount0, int256 amount1) {
-        (amount0, amount1) = poolData.pool.swap(
-            address(this),
-            zeroForOne,
-            swapAmount,
-            sqrtPriceLimitX96,
-            ""
-        );
-
+        (amount0, amount1) = poolData.pool.swap(address(this), zeroForOne, swapAmount, sqrtPriceLimitX96, "");
         emit Swapped(zeroForOne, amount0, amount1);
     }
 
@@ -199,9 +170,8 @@ library LogicLib {
         uint256 amount0,
         uint256 amount1
     ) external returns (uint256 remainingAmount0, uint256 remainingAmount1) {
-        _validateTicks(newLowerTick, newUpperTick, poolData.tickSpacing);
         if (poolData.inThePosition) revert VaultErrors.LiquidityAlreadyAdded();
-
+        _validateTicks(newLowerTick, newUpperTick, poolData.tickSpacing);
         (uint160 sqrtRatioX96, , , , , , ) = poolData.pool.slot0();
         uint128 baseLiquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtRatioX96,
@@ -210,7 +180,6 @@ library LogicLib {
             amount0,
             amount1
         );
-
         if (baseLiquidity > 0) {
             (uint256 amountDeposited0, uint256 amountDeposited1) = poolData.pool.mint(
                 address(this),
@@ -219,14 +188,7 @@ library LogicLib {
                 baseLiquidity,
                 ""
             );
-
-            emit LiquidityAdded(
-                baseLiquidity,
-                newLowerTick,
-                newUpperTick,
-                amountDeposited0,
-                amountDeposited1
-            );
+            emit LiquidityAdded(baseLiquidity, newLowerTick, newUpperTick, amountDeposited0, amountDeposited1);
 
             remainingAmount0 = amount0 - amountDeposited0;
             remainingAmount1 = amount1 - amountDeposited1;
@@ -264,8 +226,8 @@ library LogicLib {
             ? (poolData.token0, poolData.token1)
             : (poolData.token1, poolData.token0);
 
-        if (ghoAmount > 0) gho.safeTransfer(manager, ghoAmount);
-        if (tokenAmount > 0) token.safeTransfer(manager, tokenAmount);
+        if (ghoAmount != 0) gho.safeTransfer(manager, ghoAmount);
+        if (tokenAmount != 0) token.safeTransfer(manager, tokenAmount);
     }
 
     function updateFees(
@@ -281,29 +243,10 @@ library LogicLib {
         emit FeesUpdated(newManagingFee, newPerformanceFee);
     }
 
-    function getMintAmount(
-        DataTypesLib.PoolData storage poolData,
-        DataTypesLib.FeeData storage feeData,
-        DataTypesLib.AaveData storage aaveData,
-        uint256 amount
-    ) external view returns (uint256 shares) {
-        uint256 totalSupply = IRangeProtocolVault(address(this)).totalSupply();
-        if (totalSupply > 0) {
-            shares = FullMath.mulDiv(
-                amount,
-                totalSupply,
-                getUnderlyingBalance(poolData, feeData, aaveData)
-            );
-        } else {
-            shares = amount;
-        }
-    }
-
     function getCurrentFees(
         DataTypesLib.PoolData storage poolData,
         DataTypesLib.FeeData storage feeData
     ) external view returns (uint256 fee0, uint256 fee1) {
-        (, int24 tick, , , , , ) = poolData.pool.slot0();
         (
             uint128 liquidity,
             uint256 feeGrowthInside0Last,
@@ -311,12 +254,9 @@ library LogicLib {
             uint128 tokensOwed0,
             uint128 tokensOwed1
         ) = poolData.pool.positions(getPositionID(poolData));
-        fee0 =
-            _feesEarned(poolData, true, feeGrowthInside0Last, tick, liquidity) +
-            uint256(tokensOwed0);
-        fee1 =
-            _feesEarned(poolData, false, feeGrowthInside1Last, tick, liquidity) +
-            uint256(tokensOwed1);
+        (, int24 tick, , , , , ) = poolData.pool.slot0();
+        fee0 = _feesEarned(poolData, true, feeGrowthInside0Last, tick, liquidity) + uint256(tokensOwed0);
+        fee1 = _feesEarned(poolData, false, feeGrowthInside1Last, tick, liquidity) + uint256(tokensOwed1);
         (fee0, fee1) = _netPerformanceFees(feeData, fee0, fee1);
     }
 
@@ -328,23 +268,16 @@ library LogicLib {
         if (fromIdx == 0 && toIdx == 0) {
             toIdx = userData.users.length;
         }
-        DataTypesLib.UserVaultInfo[] memory usersVaultInfo = new DataTypesLib.UserVaultInfo[](
-            toIdx - fromIdx
-        );
+        DataTypesLib.UserVaultInfo[] memory usersVaultInfo = new DataTypesLib.UserVaultInfo[](toIdx - fromIdx);
         uint256 count;
         for (uint256 i = fromIdx; i < toIdx; i++) {
             DataTypesLib.UserVault memory userVault = userData.vaults[userData.users[i]];
-            usersVaultInfo[count++] = DataTypesLib.UserVaultInfo({
-                user: userData.users[i],
-                token: userVault.token
-            });
+            usersVaultInfo[count++] = DataTypesLib.UserVaultInfo({user: userData.users[i], token: userVault.token});
         }
         return usersVaultInfo;
     }
 
-    function getPositionID(
-        DataTypesLib.PoolData storage poolData
-    ) public view returns (bytes32 positionID) {
+    function getPositionID(DataTypesLib.PoolData storage poolData) public view returns (bytes32 positionID) {
         return keccak256(abi.encodePacked(address(this), poolData.lowerTick, poolData.upperTick));
     }
 
@@ -388,7 +321,6 @@ library LogicLib {
         }
 
         uint256 balanceFromAave = getCurrentBalanceFromAave(poolData, aaveData);
-
         return balanceFromPool + token0Balance + token1Balance + balanceFromAave;
     }
 
@@ -407,17 +339,14 @@ library LogicLib {
         ) = poolData.pool.positions(getPositionID(poolData));
 
         if (liquidity != 0) {
-            (uint256 amount0Current, uint256 amount1Current) = LiquidityAmounts
-                .getAmountsForLiquidity(
-                    sqrtRatioX96,
-                    poolData.lowerTick.getSqrtRatioAtTick(),
-                    poolData.upperTick.getSqrtRatioAtTick(),
-                    liquidity
-                );
-            uint256 fee0 = _feesEarned(poolData, true, feeGrowthInside0Last, tick, liquidity) +
-                uint256(tokensOwed0);
-            uint256 fee1 = _feesEarned(poolData, false, feeGrowthInside1Last, tick, liquidity) +
-                uint256(tokensOwed1);
+            (uint256 amount0Current, uint256 amount1Current) = LiquidityAmounts.getAmountsForLiquidity(
+                sqrtRatioX96,
+                poolData.lowerTick.getSqrtRatioAtTick(),
+                poolData.upperTick.getSqrtRatioAtTick(),
+                liquidity
+            );
+            uint256 fee0 = _feesEarned(poolData, true, feeGrowthInside0Last, tick, liquidity) + uint256(tokensOwed0);
+            uint256 fee1 = _feesEarned(poolData, false, feeGrowthInside1Last, tick, liquidity) + uint256(tokensOwed1);
             (fee0, fee1) = _netPerformanceFees(feeData, fee0, fee1);
 
             uint8 decimals0 = poolData.decimals0;
@@ -429,7 +358,6 @@ library LogicLib {
                 amount1Current = (amount1Current * 10 ** decimals0) / 10 ** decimals1;
                 fee1 = (fee1 * 10 ** decimals0) / 10 ** decimals1;
             }
-
             amount = amount0Current + amount1Current + fee0 + fee1;
         }
     }
@@ -438,13 +366,11 @@ library LogicLib {
         DataTypesLib.PoolData storage poolData,
         DataTypesLib.AaveData storage aaveData
     ) public view returns (uint256 amount) {
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(
-            aaveData.poolAddressesProvider.getPool()
-        ).getUserAccountData(address(this));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(aaveData.poolAddressesProvider.getPool())
+            .getUserAccountData(address(this));
 
-        uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(
-            aaveData.poolAddressesProvider.getPriceOracle()
-        ).BASE_CURRENCY_UNIT();
+        uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(aaveData.poolAddressesProvider.getPriceOracle())
+            .BASE_CURRENCY_UNIT();
         amount = totalCollateralBase - totalDebtBase;
         amount = poolData.isToken0GHO
             ? (amount * 10 ** poolData.decimals1) / BASE_CURRENCY_UNIT
@@ -481,13 +407,7 @@ library LogicLib {
         uint256 preBalance0 = poolData.token0.balanceOf(address(this));
         uint256 preBalance1 = poolData.token1.balanceOf(address(this));
         (burn0, burn1) = poolData.pool.burn(_lowerTick, _upperTick, liquidity);
-        poolData.pool.collect(
-            address(this),
-            _lowerTick,
-            _upperTick,
-            type(uint128).max,
-            type(uint128).max
-        );
+        poolData.pool.collect(address(this), _lowerTick, _upperTick, type(uint128).max, type(uint128).max);
         fee0 = poolData.token0.balanceOf(address(this)) - preBalance0 - burn0;
         fee1 = poolData.token1.balanceOf(address(this)) - preBalance1 - burn1;
     }
@@ -577,36 +497,22 @@ library LogicLib {
         fee1AfterDeduction = rawFee1 - deduct1;
     }
 
-    function supplyCollateral(
-        DataTypesLib.AaveData storage aaveData,
-        uint256 supplyAmount
-    ) external {
+    function supplyCollateral(DataTypesLib.AaveData storage aaveData, uint256 supplyAmount) external {
         IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
-        aaveData.collateralToken.approve(address(aavePool), supplyAmount);
-        aavePool.supply(address(aaveData.collateralToken), supplyAmount, address(this), 0);
-        emit CollateralSupplied(address(aaveData.collateralToken), supplyAmount);
+        IERC20Upgradeable collateralToken = aaveData.collateralToken;
+        collateralToken.approve(address(aavePool), supplyAmount);
+        aavePool.supply(address(collateralToken), supplyAmount, address(this), 0);
+        emit CollateralSupplied(address(collateralToken), supplyAmount);
     }
 
-    function withdrawCollateral(
-        DataTypesLib.AaveData storage aaveData,
-        uint256 withdrawAmount
-    ) external {
-        IPool(aaveData.poolAddressesProvider.getPool()).withdraw(
-            address(aaveData.collateralToken),
-            withdrawAmount,
-            address(this)
-        );
-        emit CollateralWithdrawn(address(aaveData.collateralToken), withdrawAmount);
+    function withdrawCollateral(DataTypesLib.AaveData storage aaveData, uint256 withdrawAmount) external {
+        address collateralToken = address(aaveData.collateralToken);
+        IPool(aaveData.poolAddressesProvider.getPool()).withdraw(collateralToken, withdrawAmount, address(this));
+        emit CollateralWithdrawn(collateralToken, withdrawAmount);
     }
 
     function mintGHO(DataTypesLib.AaveData storage aaveData, uint256 mintAmount) external {
-        IPool(aaveData.poolAddressesProvider.getPool()).borrow(
-            address(aaveData.gho),
-            mintAmount,
-            2,
-            0,
-            address(this)
-        );
+        IPool(aaveData.poolAddressesProvider.getPool()).borrow(address(aaveData.gho), mintAmount, 2, 0, address(this));
         emit GHOMinted(mintAmount);
     }
 
