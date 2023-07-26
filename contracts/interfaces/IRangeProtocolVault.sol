@@ -7,7 +7,12 @@ import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/call
 import {DataTypesLib} from "../libraries/DataTypesLib.sol";
 import {IRangeProtocolVaultGetters} from "./IRangeProtocolVaultGetters.sol";
 
-interface IRangeProtocolVault is IERC20Upgradeable, IUniswapV3MintCallback, IUniswapV3SwapCallback, IRangeProtocolVaultGetters {
+interface IRangeProtocolVault is
+    IERC20Upgradeable,
+    IUniswapV3MintCallback,
+    IUniswapV3SwapCallback,
+    IRangeProtocolVaultGetters
+{
     event Minted(address indexed receiver, uint256 shares, uint256 amount);
     event Burned(address indexed receiver, uint256 burnAmount, uint256 amount);
     event LiquidityAdded(

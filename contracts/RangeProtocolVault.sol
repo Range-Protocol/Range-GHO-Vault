@@ -40,10 +40,13 @@ contract RangeProtocolVault is
         int24 _tickSpacing,
         bytes memory data
     ) external override initializer {
-        (address manager, string memory _name, string memory _symbol, address _gho, address _poolAddressesProvider) = abi.decode(
-            data,
-            (address, string, string, address, address)
-        );
+        (
+            address manager,
+            string memory _name,
+            string memory _symbol,
+            address _gho,
+            address _poolAddressesProvider
+        ) = abi.decode(data, (address, string, string, address, address));
 
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();

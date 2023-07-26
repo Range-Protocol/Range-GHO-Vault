@@ -50,8 +50,12 @@ library DataTypesLib {
 
     struct State {
         PoolData poolData;
+        uint256[50] _emptySlots1;
         FeeData feeData;
+        uint256[50] _emptySlots2;
         UserData userData;
+        uint256[50] _emptySlots3;
         AaveData aaveData;
+        uint256[50] _emptySlots4;
     }
 }
