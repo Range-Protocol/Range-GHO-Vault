@@ -215,6 +215,12 @@ describe("RangeProtocolVault", () => {
     expect(await vault.userCount()).to.be.equal(1);
   });
 
+  it("only vault should be allowed to call mintShares from LogicLib", async () => {
+    await expect(
+      vault.mintShares(manager.address, 1)
+    ).to.be.revertedWithCustomError(vault, "OnlyVaultAllowed");
+  });
+
   it("should transfer vault shares to user2", async () => {
     const userBalance = await vault.balanceOf(manager.address);
     const transferAmount = amount1.div(2);
@@ -275,6 +281,12 @@ describe("RangeProtocolVault", () => {
 
     const managerBalanceToken = await vault.managerBalanceToken();
     expect(managerBalanceToken).to.be.equal(managingFeeAmount);
+  });
+
+  it("only vault should be allowed to call burnShares from LogicLib", async () => {
+    await expect(
+      vault.burnShares(manager.address, 1)
+    ).to.be.revertedWithCustomError(vault, "OnlyVaultAllowed");
   });
 
   describe("Manager Fee", () => {

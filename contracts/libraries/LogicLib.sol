@@ -56,12 +56,6 @@ library LogicLib {
         emit TicksSet(_lowerTick, _upperTick);
     }
 
-    function _validateTicks(int24 _lowerTick, int24 _upperTick, int24 tickSpacing) private pure {
-        if (_lowerTick < TickMath.MIN_TICK || _upperTick > TickMath.MAX_TICK) revert VaultErrors.TicksOutOfRange();
-        if (_lowerTick >= _upperTick || _lowerTick % tickSpacing != 0 || _upperTick % tickSpacing != 0)
-            revert VaultErrors.InvalidTicksSpacing();
-    }
-
     function uniswapV3MintCallback(
         DataTypesLib.PoolData storage poolData,
         uint256 amount0Owed,
@@ -243,6 +237,32 @@ library LogicLib {
         emit FeesUpdated(newManagingFee, newPerformanceFee);
     }
 
+    function supplyCollateral(DataTypesLib.AaveData storage aaveData, uint256 supplyAmount) external {
+        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
+        IERC20Upgradeable collateralToken = aaveData.collateralToken;
+        collateralToken.approve(address(aavePool), supplyAmount);
+        aavePool.supply(address(collateralToken), supplyAmount, address(this), 0);
+        emit CollateralSupplied(address(collateralToken), supplyAmount);
+    }
+
+    function withdrawCollateral(DataTypesLib.AaveData storage aaveData, uint256 withdrawAmount) external {
+        address collateralToken = address(aaveData.collateralToken);
+        IPool(aaveData.poolAddressesProvider.getPool()).withdraw(collateralToken, withdrawAmount, address(this));
+        emit CollateralWithdrawn(collateralToken, withdrawAmount);
+    }
+
+    function mintGHO(DataTypesLib.AaveData storage aaveData, uint256 mintAmount) external {
+        IPool(aaveData.poolAddressesProvider.getPool()).borrow(address(aaveData.gho), mintAmount, 2, 0, address(this));
+        emit GHOMinted(mintAmount);
+    }
+
+    function burnGHO(DataTypesLib.AaveData storage aaveData, uint256 burnAmount) external {
+        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
+        aaveData.gho.approve(address(aavePool), burnAmount);
+        aavePool.repay(address(aaveData.gho), burnAmount, 2, address(this));
+        emit GHOBurned(burnAmount);
+    }
+
     function getCurrentFees(
         DataTypesLib.PoolData storage poolData,
         DataTypesLib.FeeData storage feeData
@@ -337,7 +357,6 @@ library LogicLib {
             uint128 tokensOwed0,
             uint128 tokensOwed1
         ) = poolData.pool.positions(getPositionID(poolData));
-
         if (liquidity != 0) {
             (uint256 amount0Current, uint256 amount1Current) = LiquidityAmounts.getAmountsForLiquidity(
                 sqrtRatioX96,
@@ -396,6 +415,29 @@ library LogicLib {
 
         userData.vaults[from].token -= tokenAmount;
         userData.vaults[to].token += tokenAmount;
+    }
+
+    function getAavePositionData(
+        DataTypesLib.AaveData storage aaveData
+    )
+        external
+        view
+        returns (
+            uint256 totalCollateralBase,
+            uint256 totalDebtBase,
+            uint256 availableBorrowsBase,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        )
+    {
+        return IPool(aaveData.poolAddressesProvider.getPool()).getUserAccountData(address(this));
+    }
+
+    function _validateTicks(int24 _lowerTick, int24 _upperTick, int24 tickSpacing) private pure {
+        if (_lowerTick < TickMath.MIN_TICK || _upperTick > TickMath.MAX_TICK) revert VaultErrors.TicksOutOfRange();
+        if (_lowerTick >= _upperTick || _lowerTick % tickSpacing != 0 || _upperTick % tickSpacing != 0)
+            revert VaultErrors.InvalidTicksSpacing();
     }
 
     function _withdraw(
@@ -495,48 +537,5 @@ library LogicLib {
         uint256 deduct1 = (rawFee1 * _performanceFee) / 10_000;
         fee0AfterDeduction = rawFee0 - deduct0;
         fee1AfterDeduction = rawFee1 - deduct1;
-    }
-
-    function supplyCollateral(DataTypesLib.AaveData storage aaveData, uint256 supplyAmount) external {
-        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
-        IERC20Upgradeable collateralToken = aaveData.collateralToken;
-        collateralToken.approve(address(aavePool), supplyAmount);
-        aavePool.supply(address(collateralToken), supplyAmount, address(this), 0);
-        emit CollateralSupplied(address(collateralToken), supplyAmount);
-    }
-
-    function withdrawCollateral(DataTypesLib.AaveData storage aaveData, uint256 withdrawAmount) external {
-        address collateralToken = address(aaveData.collateralToken);
-        IPool(aaveData.poolAddressesProvider.getPool()).withdraw(collateralToken, withdrawAmount, address(this));
-        emit CollateralWithdrawn(collateralToken, withdrawAmount);
-    }
-
-    function mintGHO(DataTypesLib.AaveData storage aaveData, uint256 mintAmount) external {
-        IPool(aaveData.poolAddressesProvider.getPool()).borrow(address(aaveData.gho), mintAmount, 2, 0, address(this));
-        emit GHOMinted(mintAmount);
-    }
-
-    function burnGHO(DataTypesLib.AaveData storage aaveData, uint256 burnAmount) external {
-        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
-        aaveData.gho.approve(address(aavePool), burnAmount);
-        aavePool.repay(address(aaveData.gho), burnAmount, 2, address(this));
-        emit GHOBurned(burnAmount);
-    }
-
-    function getAavePositionData(
-        DataTypesLib.AaveData storage aaveData
-    )
-        external
-        view
-        returns (
-            uint256 totalCollateralBase,
-            uint256 totalDebtBase,
-            uint256 availableBorrowsBase,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
-            uint256 healthFactor
-        )
-    {
-        return IPool(aaveData.poolAddressesProvider.getPool()).getUserAccountData(address(this));
     }
 }

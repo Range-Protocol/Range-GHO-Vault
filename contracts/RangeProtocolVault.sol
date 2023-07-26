@@ -27,7 +27,7 @@ contract RangeProtocolVault is
     RangeProtocolVaultStorage
 {
     modifier onlyVault() {
-        if (msg.sender != address(this)) revert();
+        if (msg.sender != address(this)) revert VaultErrors.OnlyVaultAllowed();
         _;
     }
 
