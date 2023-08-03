@@ -18,6 +18,7 @@ library DataTypesLib {
         bool isToken0GHO;
         uint8 decimals0;
         uint8 decimals1;
+        uint8 vaultDecimals;
     }
 
     struct FeeData {
@@ -50,7 +51,7 @@ library DataTypesLib {
 
     struct State {
         PoolData poolData;
-        uint256[50] _emptySlots1;
+        uint256[49] _emptySlots1;
         FeeData feeData;
         uint256[50] _emptySlots2;
         UserData userData;

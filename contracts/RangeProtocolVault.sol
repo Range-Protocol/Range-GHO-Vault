@@ -64,9 +64,11 @@ contract RangeProtocolVault is
             state.poolData.isToken0GHO = true;
             state.aaveData.gho = token0;
             state.aaveData.collateralToken = token1;
+            state.poolData.vaultDecimals = state.poolData.decimals1;
         } else {
             state.aaveData.gho = token1;
             state.aaveData.collateralToken = token0;
+            state.poolData.vaultDecimals = state.poolData.decimals0;
         }
         // Managing fee is 0% at the time vault initialization.
         LogicLib.updateFees(state.feeData, 0, 250);
@@ -181,6 +183,10 @@ contract RangeProtocolVault is
         )
     {
         return LogicLib.getAavePositionData(state.aaveData);
+    }
+
+    function decimals() public view override returns (uint8) {
+        return state.poolData.vaultDecimals;
     }
 
     function getPositionID() public view override returns (bytes32 positionID) {
