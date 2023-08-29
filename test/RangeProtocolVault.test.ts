@@ -114,8 +114,14 @@ describe.only("RangeProtocolVault", () => {
       usdcAmount
     );
 
-    const ghoAmount = ethers.utils.hexlify(ethers.utils.zeroPad("0x52B7D2DCC80CD2E4000000", 32))
-    await setStorageAt(GHO, "0xc651ee22c6951bb8b5bd29e8210fb394645a94315fe10eff2cc73de1aa75c137", ghoAmount);
+    const ghoAmount = ethers.utils.hexlify(
+      ethers.utils.zeroPad("0x52B7D2DCC80CD2E4000000", 32)
+    );
+    await setStorageAt(
+      GHO,
+      "0xc651ee22c6951bb8b5bd29e8210fb394645a94315fe10eff2cc73de1aa75c137",
+      ghoAmount
+    );
 
     // console.log((await token0.balanceOf(manager.address)).toString());
     // console.log((await token1.balanceOf(manager.address)).toString());
@@ -256,8 +262,7 @@ describe.only("RangeProtocolVault", () => {
 
   it("should burn vault shares", async () => {
     const burnAmount = await vault.balanceOf(manager.address);
-    const {amount0, amount1} = await vault.getUnderlyingBalances();
-    const userBalance0Before = await token0.balanceOf(manager.address);
+    const amount = await vault.getBalanceInCollateralToken();
     const userBalance1Before = await token1.balanceOf(manager.address);
 
     const { token: userVaultTokenBefore } = await vault.userVaults(
@@ -268,32 +273,22 @@ describe.only("RangeProtocolVault", () => {
     const managingFee = await vault.managingFee();
     const totalSupply = await vault.totalSupply();
     const vaultShares = await vault.balanceOf(manager.address);
-    const userBalance0 = amount0.mul(vaultShares).div(totalSupply);
-    const userBalance1 = amount1.mul(vaultShares).div(totalSupply);
+    const userBalance = amount.mul(vaultShares).div(totalSupply);
 
-    const managingFeeAmount0 = userBalance0.mul(managingFee).div(10_000);
-    const managingFeeAmount1 = userBalance1.mul(managingFee).div(10_000);
+    const managingFeeAmount1 = userBalance.mul(managingFee).div(10_000);
 
     await vault.burn(burnAmount);
     expect(await vault.totalSupply()).to.be.equal(totalSupply.sub(burnAmount));
 
-    const amount0Got = amount0.mul(burnAmount).div(totalSupply);
-    const amount1Got = amount1.mul(burnAmount).div(totalSupply);
-
-    expect(await token0.balanceOf(manager.address)).to.be.equal(
-      userBalance0Before.add(amount0Got).sub(managingFeeAmount0)
-    );
-
+    // const amount1Got = amount1.mul(burnAmount).div(totalSupply);
     expect(await token1.balanceOf(manager.address)).to.be.equal(
-        userBalance1Before.add(amount1Got).sub(managingFeeAmount1)
+      userBalance1Before.add(userBalance).sub(managingFeeAmount1)
     );
 
     const { token: userVaultTokenAfter } = await vault.userVaults(
       manager.address
     );
     expect(userVaultTokenAfter).to.be.equal(bn(0));
-
-    expect(await vault.managerBalance0()).to.be.equal(managingFeeAmount0);
     expect(await vault.managerBalance1()).to.be.equal(managingFeeAmount1);
   });
 

@@ -22,7 +22,7 @@ library LogicLib {
     uint16 public constant MAX_MANAGING_FEE_BPS = 100;
 
     event Minted(address indexed receiver, uint256 shares, uint256 amount);
-    event Burned(address indexed receiver, uint256 burnAmount, uint256 amount0, uint256 amount1);
+    event Burned(address indexed receiver, uint256 burnAmount, uint256 amount);
     event LiquidityAdded(
         uint256 liquidityMinted,
         int24 tickLower,
@@ -98,10 +98,7 @@ library LogicLib {
         emit Minted(msg.sender, shares, amount);
     }
 
-    function burn(
-        DataTypesLib.State storage state,
-        uint256 shares
-    ) external returns (uint256 amount0, uint256 amount1) {
+    function burn(DataTypesLib.State storage state, uint256 shares) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
         if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThrehold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
@@ -109,29 +106,15 @@ library LogicLib {
         uint256 balanceBefore = vault.balanceOf(msg.sender);
         vault.burnShares(msg.sender, shares);
 
-        (uint256 amount0Current, uint256 amount1Current) = getUnderlyingBalances(state);
-        amount0 = FullMath.mulDiv(amount0Current, shares, totalSupply);
-        amount1 = FullMath.mulDiv(amount1Current, shares, totalSupply);
+        uint256 underlyingAmountInCollateralToken = getBalanceInCollateralToken(state);
+        amount = FullMath.mulDiv(underlyingAmountInCollateralToken, shares, totalSupply);
 
-        //        if (state.inThePosition) {
-        //            (uint128 liquidity, , , , ) = state.pool.positions(getPositionID(state));
-        //            uint256 liquidityBurned_ = FullMath.mulDiv(shares, liquidity, totalSupply);
-        //            uint128 liquidityBurned = SafeCastUpgradeable.toUint128(liquidityBurned_);
-        //            (, , uint256 fee0, uint256 fee1) = _withdraw(state, liquidityBurned);
-        //
-        //            _applyPerformanceFee(state, fee0, fee1);
-        //            (fee0, fee1) = _netPerformanceFees(state, fee0, fee1);
-        //            emit FeesEarned(fee0, fee1);
-        //        }
-
-        _applyManagingFee(state, amount0, amount1);
-        (amount0, amount1) = _netManagingFees(state, amount0, amount1);
+        _applyManagingFee(state, amount);
+        amount = _netManagingFees(state, amount);
         state.vaults[msg.sender].token = (state.vaults[msg.sender].token * (balanceBefore - shares)) / balanceBefore;
 
-        if (amount0 != 0) state.token0.safeTransfer(msg.sender, amount0);
-        if (amount1 != 0) state.token1.safeTransfer(msg.sender, amount1);
-
-        emit Burned(msg.sender, shares, amount0, amount1);
+        IERC20Upgradeable(vault.collateralToken()).safeTransfer(msg.sender, amount);
+        emit Burned(msg.sender, shares, amount);
     }
 
     function removeLiquidity(DataTypesLib.State storage state) external {
@@ -305,16 +288,19 @@ library LogicLib {
         uint256 decimals1;
     }
 
-    function getUnderlyingBalances(
-        DataTypesLib.State storage state
-    ) public view returns (uint256 amount0, uint256 amount1) {
+    function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
         (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        uint8 collateralPriceDecimals = state.collateralTokenPriceFeed.decimals();
         (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
 
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
-        (vars.amount0FromAave, vars.amount1FromAave) = getUnderlyingBalancesFromAave(state);
+        (vars.amount0FromAave, vars.amount1FromAave) = getUnderlyingBalancesFromAave(
+            state,
+            uint256(ghoPrice),
+            uint256(collateralPrice)
+        );
         (vars.decimals0, vars.decimals1) = (state.decimals0, state.decimals1);
 
         if (state.isToken0GHO) {
@@ -347,18 +333,12 @@ library LogicLib {
             }
         }
 
-        amount0 = vars.token0BalanceSigned > int256(state.managerBalance0)
+        uint256 amount0 = vars.token0BalanceSigned > int256(state.managerBalance0)
             ? uint256(vars.token0BalanceSigned) - state.managerBalance0
             : 0;
-        amount1 = vars.token1BalanceSigned > int256(state.managerBalance1)
+        uint256 amount1 = vars.token1BalanceSigned > int256(state.managerBalance1)
             ? uint256(vars.token1BalanceSigned) - state.managerBalance1
             : 0;
-    }
-
-    function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
-        (uint256 amount0, uint256 amount1) = getUnderlyingBalances(state);
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
 
         if (state.isToken0GHO) {
             amount0 =
@@ -377,13 +357,12 @@ library LogicLib {
     function getUnderlyingBalancesByShare(
         DataTypesLib.State storage state,
         uint256 shares
-    ) external view returns (uint256 amount0, uint256 amount1) {
+    ) external view returns (uint256 amount) {
         uint256 _totalSupply = IRangeProtocolVault(address(this)).totalSupply();
         if (_totalSupply != 0) {
-            (uint256 amount0Total, uint256 amount1Total) = getUnderlyingBalances(state);
-            amount0 = (shares * amount0Total) / _totalSupply;
-            amount1 = (shares * amount1Total) / _totalSupply;
-            (amount0, amount1) = _netManagingFees(state, amount0, amount1);
+            uint256 totalUnderlyingBalanceInCollateralToken = getBalanceInCollateralToken(state);
+            amount = (shares * totalUnderlyingBalanceInCollateralToken) / _totalSupply;
+            amount = _netManagingFees(state, amount);
         }
     }
 
@@ -416,7 +395,9 @@ library LogicLib {
     }
 
     function getUnderlyingBalancesFromAave(
-        DataTypesLib.State storage state
+        DataTypesLib.State storage state,
+        uint256 ghoPrice,
+        uint256 collateralTokenPrice
     ) public view returns (uint256 amount0, uint256 amount1) {
         (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(state.poolAddressesProvider.getPool())
             .getUserAccountData(address(this));
@@ -425,12 +406,12 @@ library LogicLib {
             .BASE_CURRENCY_UNIT();
         (amount0, amount1) = state.isToken0GHO
             ? (
-                (totalDebtBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT,
-                (totalCollateralBase * 10 ** state.decimals1) / BASE_CURRENCY_UNIT
+                (totalDebtBase * 10 ** state.decimals0) / ghoPrice / BASE_CURRENCY_UNIT,
+                (totalCollateralBase * 10 ** state.decimals1) / collateralTokenPrice / BASE_CURRENCY_UNIT
             )
             : (
-                (totalCollateralBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT,
-                (totalDebtBase * 10 ** state.decimals1) / BASE_CURRENCY_UNIT
+                (totalCollateralBase * 10 ** state.decimals0) / ghoPrice / BASE_CURRENCY_UNIT,
+                (totalDebtBase * 10 ** state.decimals1) / collateralTokenPrice / BASE_CURRENCY_UNIT
             );
     }
 
@@ -546,14 +527,13 @@ library LogicLib {
             ? (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice)
             : (10 ** state.decimals0 * uint256(collateralPrice)) / uint256(ghoPrice);
 
-        uint256 priceSpread = (priceFromUniswap * 10000) / priceFromOracle;
-        return priceSpread <= 10100 && priceSpread >= 9900;
+        uint256 priceRatio = (priceFromUniswap * 10000) / priceFromOracle;
+        return priceRatio <= 10050 && priceRatio >= 9950;
     }
 
-    function _applyManagingFee(DataTypesLib.State storage state, uint256 amount0, uint256 amount1) private {
-        uint256 _managingFee = state.managingFee;
-        state.managerBalance0 += (amount0 * _managingFee) / 10_000;
-        state.managerBalance1 += (amount1 * _managingFee) / 10_000;
+    function _applyManagingFee(DataTypesLib.State storage state, uint256 amount) private {
+        if (state.isToken0GHO) state.managerBalance1 += (amount * state.managingFee) / 10_000;
+        else state.managerBalance0 += (amount * state.managingFee) / 10_000;
     }
 
     function _applyPerformanceFee(DataTypesLib.State storage state, uint256 fee0, uint256 fee1) private {
@@ -564,14 +544,10 @@ library LogicLib {
 
     function _netManagingFees(
         DataTypesLib.State storage state,
-        uint256 amount0,
-        uint256 amount1
-    ) private view returns (uint256 amount0AfterFee, uint256 amount1AfterFee) {
-        uint256 _managingFee = state.managingFee;
-        uint256 deduct0 = (amount0 * _managingFee) / 10_000;
-        uint256 deduct1 = (amount1 * _managingFee) / 10_000;
-        amount0AfterFee = amount0 - deduct0;
-        amount1AfterFee = amount1 - deduct1;
+        uint256 amount
+    ) private view returns (uint256 amountAfterFee) {
+        uint256 deduct = (amount * state.managingFee) / 10_000;
+        amountAfterFee = amount - deduct;
     }
 
     function _netPerformanceFees(

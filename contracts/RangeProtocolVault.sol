@@ -110,9 +110,7 @@ contract RangeProtocolVault is
         return LogicLib.mint(state, amount);
     }
 
-    function burn(
-        uint256 burnAmount
-    ) external override nonReentrant whenNotPaused returns (uint256 amount0, uint256 amount1) {
+    function burn(uint256 burnAmount) external override nonReentrant whenNotPaused returns (uint256 amount) {
         return LogicLib.burn(state, burnAmount);
     }
 
@@ -199,13 +197,7 @@ contract RangeProtocolVault is
         return LogicLib.getPositionID(state);
     }
 
-    function getUnderlyingBalances() public view override returns (uint256 amount0, uint256 amount1) {
-        return LogicLib.getUnderlyingBalances(state);
-    }
-
-    function getUnderlyingBalancesByShare(
-        uint256 shares
-    ) external view override returns (uint256 amount0, uint256 amount1) {
+    function getUnderlyingBalancesByShare(uint256 shares) external view override returns (uint256 amount) {
         return LogicLib.getUnderlyingBalancesByShare(state, shares);
     }
 

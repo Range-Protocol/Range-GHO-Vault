@@ -14,7 +14,7 @@ interface IRangeProtocolVault is
     IRangeProtocolVaultGetters
 {
     event Minted(address indexed receiver, uint256 shares, uint256 amount);
-    event Burned(address indexed receiver, uint256 burnAmount, uint256 amount0, uint256 amount1);
+    event Burned(address indexed receiver, uint256 burnAmount, uint256 amount);
     event LiquidityAdded(
         uint256 liquidityMinted,
         int24 tickLower,
@@ -45,7 +45,7 @@ interface IRangeProtocolVault is
 
     function mint(uint256 amount) external returns (uint256 shares);
 
-    function burn(uint256 burnAmount) external returns (uint256 amount0, uint256 amount1);
+    function burn(uint256 burnAmount) external returns (uint256 amount);
 
     function mintShares(address to, uint256 shares) external;
 
@@ -70,11 +70,9 @@ interface IRangeProtocolVault is
 
     function updateFees(uint16 newManagingFee, uint16 newPerformanceFee) external;
 
-    function getUnderlyingBalances() external view returns (uint256 amount0, uint256 amount1);
-
     function getBalanceInCollateralToken() external view returns (uint256 amount);
 
-    function getUnderlyingBalancesByShare(uint256 shares) external view returns (uint256 amount0, uint256 amount1);
+    function getUnderlyingBalancesByShare(uint256 shares) external view returns (uint256 amount);
 
     function getCurrentFees() external view returns (uint256 fee0, uint256 fee1);
 
