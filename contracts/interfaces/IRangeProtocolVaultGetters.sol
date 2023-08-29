@@ -28,9 +28,9 @@ interface IRangeProtocolVaultGetters {
 
     function performanceFee() external view returns (uint16);
 
-    function managerBalanceGHO() external view returns (uint256);
+    function managerBalance0() external view returns (uint256);
 
-    function managerBalanceToken() external view returns (uint256);
+    function managerBalance1() external view returns (uint256);
 
     function userVaults(address user) external view returns (DataTypesLib.UserVault memory);
 

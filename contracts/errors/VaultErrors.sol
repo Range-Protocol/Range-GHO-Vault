@@ -13,4 +13,5 @@ library VaultErrors {
     error OnlyFactoryAllowed();
     error LiquidityAlreadyAdded();
     error OnlyVaultAllowed();
+    error PriceNotWithinThrehold();
 }

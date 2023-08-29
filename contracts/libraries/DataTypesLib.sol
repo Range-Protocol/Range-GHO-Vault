@@ -1,12 +1,23 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
 library DataTypesLib {
-    struct PoolData {
+    struct UserVault {
+        bool exists;
+        uint256 token;
+    }
+
+    struct UserVaultInfo {
+        address user;
+        uint256 token;
+    }
+
+    struct State {
         address factory;
         IUniswapV3Pool pool;
         IERC20Upgradeable token0;
@@ -19,44 +30,14 @@ library DataTypesLib {
         uint8 decimals0;
         uint8 decimals1;
         uint8 vaultDecimals;
-    }
-
-    struct FeeData {
         uint16 managingFee;
         uint16 performanceFee;
-        uint256 managerBalanceGHO;
-        uint256 managerBalanceToken;
-    }
-
-    struct UserData {
+        uint256 managerBalance0;
+        uint256 managerBalance1;
+        IPoolAddressesProvider poolAddressesProvider;
+        AggregatorV3Interface collateralTokenPriceFeed;
+        AggregatorV3Interface ghoPriceFeed;
         mapping(address => UserVault) vaults;
         address[] users;
-    }
-
-    struct AaveData {
-        IPoolAddressesProvider poolAddressesProvider;
-        IERC20Upgradeable gho;
-        IERC20Upgradeable collateralToken;
-    }
-
-    struct UserVault {
-        bool exists;
-        uint256 token;
-    }
-
-    struct UserVaultInfo {
-        address user;
-        uint256 token;
-    }
-
-    struct State {
-        PoolData poolData;
-        uint256[49] _emptySlots1;
-        FeeData feeData;
-        uint256[50] _emptySlots2;
-        UserData userData;
-        uint256[50] _emptySlots3;
-        AaveData aaveData;
-        uint256[50] _emptySlots4;
     }
 }

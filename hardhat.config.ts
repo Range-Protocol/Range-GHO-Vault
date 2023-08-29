@@ -1,4 +1,5 @@
 import { HardhatUserConfig } from "hardhat/config";
+require("hardhat-contract-sizer");
 
 // PLUGINS
 import "@nomiclabs/hardhat-ethers";
@@ -23,6 +24,11 @@ const config: HardhatUserConfig = {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
   networks: {
+    hardhat: {
+      forking: {
+        url: "https://eth.llamarpc.com\t",
+      },
+    },
     mainnet: {
       accounts: PK ? [PK] : [],
       chainId: 1,

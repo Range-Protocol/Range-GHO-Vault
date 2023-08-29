@@ -10,78 +10,78 @@ abstract contract RangeProtocolVaultStorage is IRangeProtocolVault {
     DataTypesLib.State internal state;
 
     function factory() external view override returns (address) {
-        return state.poolData.factory;
+        return state.factory;
     }
 
     function pool() external view override returns (IUniswapV3Pool) {
-        return state.poolData.pool;
+        return state.pool;
     }
 
     function token0() external view override returns (IERC20Upgradeable) {
-        return state.poolData.token0;
+        return state.token0;
     }
 
     function token1() external view override returns (IERC20Upgradeable) {
-        return state.poolData.token1;
+        return state.token1;
     }
 
     function lowerTick() external view override returns (int24) {
-        return state.poolData.lowerTick;
+        return state.lowerTick;
     }
 
     function upperTick() external view override returns (int24) {
-        return state.poolData.upperTick;
+        return state.upperTick;
     }
 
     function tickSpacing() external view override returns (int24) {
-        return state.poolData.tickSpacing;
+        return state.tickSpacing;
     }
 
     function inThePosition() external view override returns (bool) {
-        return state.poolData.inThePosition;
+        return state.inThePosition;
     }
 
     function isToken0GHO() external view override returns (bool) {
-        return state.poolData.isToken0GHO;
+        return state.isToken0GHO;
     }
 
     function managingFee() external view override returns (uint16) {
-        return state.feeData.managingFee;
+        return state.managingFee;
     }
 
     function performanceFee() external view override returns (uint16) {
-        return state.feeData.performanceFee;
+        return state.performanceFee;
     }
 
-    function managerBalanceGHO() external view override returns (uint256) {
-        return state.feeData.managerBalanceGHO;
+    function managerBalance0() external view override returns (uint256) {
+        return state.managerBalance0;
     }
 
-    function managerBalanceToken() external view override returns (uint256) {
-        return state.feeData.managerBalanceToken;
+    function managerBalance1() external view override returns (uint256) {
+        return state.managerBalance1;
     }
 
     function userVaults(address user) external view override returns (DataTypesLib.UserVault memory) {
-        return state.userData.vaults[user];
+        return state.vaults[user];
     }
 
     function userCount() external view override returns (uint256) {
-        return state.userData.users.length;
+        return state.users.length;
     }
 
     function users(uint256 index) external view override returns (address) {
-        return state.userData.users[index];
+        return state.users[index];
     }
 
     function poolAddressesProvider() external view override returns (address) {
-        return address(state.aaveData.poolAddressesProvider);
+        return address(state.poolAddressesProvider);
     }
 
     function gho() external view override returns (address) {
-        return address(state.aaveData.gho);
+        return state.isToken0GHO ? address(state.token0) : address(state.token1);
     }
 
     function collateralToken() external view override returns (address) {
-        return address(state.aaveData.collateralToken);
+        return state.isToken0GHO ? address(state.token1) : address(state.token0);
     }
 }
