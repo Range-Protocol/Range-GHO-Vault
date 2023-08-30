@@ -290,7 +290,6 @@ library LogicLib {
 
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
         (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        uint8 collateralPriceDecimals = state.collateralTokenPriceFeed.decimals();
         (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
 
@@ -312,10 +311,12 @@ library LogicLib {
             );
 
             if (vars.token0BalanceSigned < 0) {
-                uint256 ghoDeficit = (uint256(-vars.token0BalanceSigned) * 10 ** vars.decimals1 * uint256(ghoPrice)) /
+                uint256 ghoDeficitInCollateralToken = (uint256(-vars.token0BalanceSigned) *
+                    10 ** vars.decimals1 *
+                    uint256(ghoPrice)) /
                     uint256(collateralPrice) /
                     10 ** vars.decimals0;
-                vars.token1BalanceSigned -= int256(ghoDeficit);
+                vars.token1BalanceSigned -= int256(ghoDeficitInCollateralToken);
             }
         } else {
             vars.token0BalanceSigned = int256(
@@ -326,10 +327,12 @@ library LogicLib {
             );
 
             if (vars.token1BalanceSigned < 0) {
-                uint256 ghoDeficit = (uint256(-vars.token1BalanceSigned) * 10 ** vars.decimals0 * uint256(ghoPrice)) /
+                uint256 ghoDeficitInCollateralToken = (uint256(-vars.token1BalanceSigned) *
+                    10 ** vars.decimals0 *
+                    uint256(ghoPrice)) /
                     uint256(collateralPrice) /
                     10 ** vars.decimals1;
-                vars.token0BalanceSigned -= int256(ghoDeficit);
+                vars.token0BalanceSigned -= int256(ghoDeficitInCollateralToken);
             }
         }
 
@@ -410,8 +413,8 @@ library LogicLib {
                 (totalCollateralBase * 10 ** state.decimals1) / collateralTokenPrice / BASE_CURRENCY_UNIT
             )
             : (
-                (totalCollateralBase * 10 ** state.decimals0) / ghoPrice / BASE_CURRENCY_UNIT,
-                (totalDebtBase * 10 ** state.decimals1) / collateralTokenPrice / BASE_CURRENCY_UNIT
+                (totalCollateralBase * 10 ** state.decimals0) / collateralTokenPrice / BASE_CURRENCY_UNIT,
+                (totalDebtBase * 10 ** state.decimals1) / ghoPrice / BASE_CURRENCY_UNIT
             );
     }
 
