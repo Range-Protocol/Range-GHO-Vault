@@ -75,7 +75,7 @@ contract RangeProtocolVault is
             state.vaultDecimals = decimals0;
         }
         // Managing fee is 0% at the time vault initialization.
-        LogicLib.updateFees(state, 0, 250);
+        LogicLib.updateFees(state, 10, 250);
     }
 
     function updateTicks(int24 _lowerTick, int24 _upperTick) external override onlyManager {
