@@ -197,8 +197,8 @@ contract RangeProtocolVault is
         return LogicLib.getPositionID(state);
     }
 
-    function getUnderlyingBalancesByShare(uint256 shares) external view override returns (uint256 amount) {
-        return LogicLib.getUnderlyingBalancesByShare(state, shares);
+    function getUnderlyingBalanceByShare(uint256 shares) external view override returns (uint256 amount) {
+        return LogicLib.getUnderlyingBalanceByShare(state, shares);
     }
 
     function getBalanceInCollateralToken() public view override returns (uint256 amount) {

@@ -357,7 +357,7 @@ library LogicLib {
         return amount0 + amount1;
     }
 
-    function getUnderlyingBalancesByShare(
+    function getUnderlyingBalanceByShare(
         DataTypesLib.State storage state,
         uint256 shares
     ) external view returns (uint256 amount) {
