@@ -26,7 +26,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://eth.llamarpc.com\t",
+        url: "https://eth.llamarpc.com",
       },
     },
     mainnet: {

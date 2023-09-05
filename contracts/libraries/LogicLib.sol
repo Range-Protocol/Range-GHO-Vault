@@ -14,6 +14,10 @@ import {IRangeProtocolVault} from "../interfaces/IRangeProtocolVault.sol";
 import {IPriceOracleExtended} from "../interfaces/IPriceOracleExtended.sol";
 import {VaultErrors} from "../errors/VaultErrors.sol";
 
+/**
+ * @notice LogicLib library contains the implementation logic of vault. It accepts DataTypesLib.State struct to
+ * access vault state.
+ */
 library LogicLib {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using TickMath for int24;
@@ -47,6 +51,10 @@ library LogicLib {
     event GHOMinted(uint256 amount);
     event GHOBurned(uint256 amount);
 
+    // @notice updates the tick range upon vault deployment or when the vault is out of position and totalSupply is zero.
+    // It can only be called by the manager.
+    // @param _lowerTick lower tick of the position.
+    // @param _upperTick upper tick of the position.
     function updateTicks(DataTypesLib.State storage state, int24 _lowerTick, int24 _upperTick) external {
         if (IRangeProtocolVault(address(this)).totalSupply() != 0 || state.inThePosition)
             revert VaultErrors.NotAllowedToUpdateTicks();
@@ -57,6 +65,9 @@ library LogicLib {
         emit TicksSet(_lowerTick, _upperTick);
     }
 
+    // @notice uniswapV3 mint callback implementation.
+    // @param amount0Owed amount in token0 to transfer.
+    // @param amount1Owed amount in token1 to transfer.
     function uniswapV3MintCallback(
         DataTypesLib.State storage state,
         uint256 amount0Owed,
@@ -67,6 +78,9 @@ library LogicLib {
         if (amount1Owed > 0) state.token1.safeTransfer(msg.sender, amount1Owed);
     }
 
+    // @notice uniswapV3 swap callback implementation.
+    // @param amount0Delta amount0 added (+) or to be taken (-) from the vault.
+    // @param amount1Delta amount1 added (+) or to be taken (-) from the vault.
     function uniswapV3SwapCallback(
         DataTypesLib.State storage state,
         int256 amount0Delta,
@@ -77,6 +91,10 @@ library LogicLib {
         else if (amount1Delta > 0) state.token1.safeTransfer(msg.sender, uint256(amount1Delta));
     }
 
+    // @notice called by the user with collateral amount to provide liquidity in collateral amount. The mint must fail
+    // if the gho price is not within threshold of 0.5%.
+    // @param amount the amount of collateral to provide.
+    // @return shares the amount of shares minted.
     function mint(DataTypesLib.State storage state, uint256 amount) external returns (uint256 shares) {
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
         if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThrehold();
@@ -98,6 +116,10 @@ library LogicLib {
         emit Minted(msg.sender, shares, amount);
     }
 
+    // @notice called by the user with share amount to burn their vault shares redeem their share of the asset. The burn
+    // must fail if the gho price is not within threshold of 0.5%.
+    // @param burnAmount the amount of vault shares to burn.
+    // @return shares the amount of assets in collateral token received by the user.
     function burn(DataTypesLib.State storage state, uint256 shares) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
         if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThrehold();
@@ -117,6 +139,7 @@ library LogicLib {
         emit Burned(msg.sender, shares, amount);
     }
 
+    // @notice called by manager to remove liquidity from the pool.
     function removeLiquidity(DataTypesLib.State storage state) external {
         (uint128 liquidity, , , , ) = state.pool.positions(getPositionID(state));
         if (liquidity != 0) {
@@ -133,6 +156,12 @@ library LogicLib {
         emit InThePositionStatusSet(false);
     }
 
+    // @notice called by manager to perform swap from token0 to token1 and vice-versa.
+    // @param zeroForOne swap direction (true -> x to y) or (false -> y to x)
+    // @param swapAmount amount to swap (+ve -> exact in, -ve exact out)
+    // @param sqrtPriceLimitX96 the limit pool price can move when filling the order.
+    // @param amount0 amount0 added (+) or to be taken (-) from the vault.
+    // @param amount1 amount1 added (+) or to be taken (-) from the vault.
     function swap(
         DataTypesLib.State storage state,
         bool zeroForOne,
@@ -143,6 +172,13 @@ library LogicLib {
         emit Swapped(zeroForOne, amount0, amount1);
     }
 
+    // @notice called by manager to provide liquidity to pool into a newer tick range.
+    // @param newLowerTick lower tick of the position.
+    // @param newUpperTick upper tick of the position.
+    // @param amount0 amount in token0 to add.
+    // @param amount1 amount in token1 to add.
+    // @return remainingAmount0 amount in token0 left passive in the vault.
+    // @return remainingAmount1 amount in token1 left passive in the vault.
     function addLiquidity(
         DataTypesLib.State storage state,
         int24 newLowerTick,
@@ -181,6 +217,7 @@ library LogicLib {
         }
     }
 
+    // @notice called by manager to transfer the unclaimed fee from pool to the vault.
     function pullFeeFromPool(DataTypesLib.State storage state) external {
         (, , uint256 fee0, uint256 fee1) = _withdraw(state, 0);
         _applyPerformanceFee(state, fee0, fee1);
@@ -188,6 +225,7 @@ library LogicLib {
         emit FeesEarned(fee0, fee1);
     }
 
+    // @notice called by manager to collect fee from the vault.
     function collectManager(DataTypesLib.State storage state, address manager) external {
         uint256 balance0 = state.managerBalance0;
         uint256 balance1 = state.managerBalance1;
@@ -198,6 +236,9 @@ library LogicLib {
         if (balance1 != 0) state.token1.safeTransfer(manager, balance1);
     }
 
+    // @notice called by the manager to update the fees.
+    // @param newManagingFee new managing fee percentage out of 10_000.
+    // @param newPerformanceFee new performance fee percentage out of 10_000.
     function updateFees(DataTypesLib.State storage state, uint16 newManagingFee, uint16 newPerformanceFee) external {
         if (newManagingFee > MAX_MANAGING_FEE_BPS) revert VaultErrors.InvalidManagingFee();
         if (newPerformanceFee > MAX_PERFORMANCE_FEE_BPS) revert VaultErrors.InvalidPerformanceFee();
@@ -207,6 +248,8 @@ library LogicLib {
         emit FeesUpdated(newManagingFee, newPerformanceFee);
     }
 
+    // @notice supplied collateral to Aave. Called by manager only.
+    // @param supplyAmount amount of collateral to supply.
     function supplyCollateral(DataTypesLib.State storage state, uint256 supplyAmount) external {
         IPool aavePool = IPool(state.poolAddressesProvider.getPool());
         IERC20Upgradeable collateralToken = IERC20Upgradeable(IRangeProtocolVault(address(this)).collateralToken());
@@ -215,12 +258,16 @@ library LogicLib {
         emit CollateralSupplied(address(collateralToken), supplyAmount);
     }
 
+    // @notice withdraws collateral from Aave. Called by manager only.
+    // @param withdrawAmount amount of collateral to withdraw.
     function withdrawCollateral(DataTypesLib.State storage state, uint256 withdrawAmount) external {
         address collateralToken = IRangeProtocolVault(address(this)).collateralToken();
         IPool(state.poolAddressesProvider.getPool()).withdraw(collateralToken, withdrawAmount, address(this));
         emit CollateralWithdrawn(collateralToken, withdrawAmount);
     }
 
+    // @notice borrows GHO token from Aave. Called by manager only.
+    // @param mint amount of GHO to mint.
     function mintGHO(DataTypesLib.State storage state, uint256 mintAmount) external {
         uint256 interestRateMode = 2; // open debt at a variable rate
         IPool(state.poolAddressesProvider.getPool()).borrow(
@@ -233,6 +280,8 @@ library LogicLib {
         emit GHOMinted(mintAmount);
     }
 
+    // @notice payback GHO debt to Aave. Called by manager only.
+    // @param burnAmount amount of GHO debt to payback.
     function burnGHO(DataTypesLib.State storage state, uint256 burnAmount) external {
         IPool aavePool = IPool(state.poolAddressesProvider.getPool());
         IERC20Upgradeable gho = IERC20Upgradeable(IRangeProtocolVault(address(this)).gho());
@@ -242,6 +291,11 @@ library LogicLib {
         emit GHOBurned(burnAmount);
     }
 
+    /**
+     * @notice returns current unclaimed fees from the pool. Calls getCurrentFees on the LogicLib.
+     * @return fee0 fee in token0
+     * @return fee1 fee in token1
+     */
     function getCurrentFees(DataTypesLib.State storage state) external view returns (uint256 fee0, uint256 fee1) {
         (
             uint128 liquidity,
@@ -256,6 +310,12 @@ library LogicLib {
         (fee0, fee1) = _netPerformanceFees(state, fee0, fee1);
     }
 
+    /**
+     * @notice returns user vaults based on the provided index. Calls getUserVaults on LogicLib.
+     * @param fromIdx the starting index to fetch users.
+     * @param toIdx the ending index to fetch users.
+     * @return UserVaultInfo
+     */
     function getUserVaults(
         DataTypesLib.State storage state,
         uint256 fromIdx,
@@ -273,6 +333,8 @@ library LogicLib {
         return usersVaultInfo;
     }
 
+    // @notice returns position id of the vault in pool.
+    // @return positionId the id of the position in pool.
     function getPositionID(DataTypesLib.State storage state) public view returns (bytes32 positionID) {
         return keccak256(abi.encodePacked(address(this), state.lowerTick, state.upperTick));
     }
@@ -288,6 +350,16 @@ library LogicLib {
         uint256 decimals1;
     }
 
+    // @notice returns vault asset's balance in collateral token. It gets balances from the following three places.
+    // Gets token0 and token1 balance from the AMM pool. Converts gho token amount to collateral token.
+    // Gets collateral deposited to Aave and gho borrowed. Subtracts borrowed gho amount converted to collateral from
+    // collateral amount.
+    // Gets collateral and gho amounts sitting passive in the contract.
+    // If the gho debt in Aave is greater than gho balance in AMM pool + gho balance passive in the contract then deficit
+    // in gho is converted to collateral token and subtracted from the collateral amount to account for the gho deficit.
+    // Additionally, to avoid underflow the managerBalance is only subtracted from the vault balance if it is less than the
+    // vault balance.
+    // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
         (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
         (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
@@ -357,6 +429,9 @@ library LogicLib {
         return amount0 + amount1;
     }
 
+    // @notice returns underlying balance in collateral token based on the shares amount passed.
+    // @param shares amount of vault to calculate the redeemable amount against.
+    // @return amount the amount of asset in collateral token redeemable against the provided amount of collateral.
     function getUnderlyingBalanceByShare(
         DataTypesLib.State storage state,
         uint256 shares
@@ -369,6 +444,9 @@ library LogicLib {
         }
     }
 
+    // @notice returns amount0 and amount1 from the AMM pool.
+    // @param amount0 the amount in token0 from AMM pool.
+    // @param amount1 the amount in token1 from AMM pool.
     function getUnderlyingBalancesFromPool(
         DataTypesLib.State storage state,
         uint160 sqrtRatioX96,
@@ -397,6 +475,9 @@ library LogicLib {
         }
     }
 
+    // @notice returns the supplied collateral and borrowed from Aave.
+    // @param amount0 collateral supplied to Aave if token0 is collateral token else gho amount borrowed.
+    // @param amount1 collateral supplied to Aave if token1 is collateral token else gho amount borrowed.
     function getUnderlyingBalancesFromAave(
         DataTypesLib.State storage state,
         uint256 ghoPrice,
@@ -418,6 +499,10 @@ library LogicLib {
             );
     }
 
+    // @notice transfer hook to transfer the exposure from sender to recipient.
+    // @param from the sender of vault shares.
+    // @param to recipient of vault shares.
+    // @param amount amount of vault shares to transfer.
     function _beforeTokenTransfer(DataTypesLib.State storage state, address from, address to, uint256 amount) external {
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         if (from == address(0x0) || to == address(0x0)) return;
@@ -434,6 +519,15 @@ library LogicLib {
         state.vaults[to].token += tokenAmount;
     }
 
+    /**
+     * @notice returns Aave position data.
+     * @return totalCollateralBase total collateral supplied.
+     * @return totalDebtBase total debt borrowed.
+     * @return availableBorrowsBase available amount to borrow.
+     * @return currentLiquidationThreshold current threshold for liquidation to trigger.
+     * @return ltv Loan-to-value ratio of the position.
+     * @return healthFactor current health factor of the position.
+     */
     function getAavePositionData(
         DataTypesLib.State storage state
     )
@@ -451,12 +545,19 @@ library LogicLib {
         return IPool(state.poolAddressesProvider.getPool()).getUserAccountData(address(this));
     }
 
+    // @notice validated the lower and upper ticks.
     function _validateTicks(int24 _lowerTick, int24 _upperTick, int24 tickSpacing) private pure {
         if (_lowerTick < TickMath.MIN_TICK || _upperTick > TickMath.MAX_TICK) revert VaultErrors.TicksOutOfRange();
         if (_lowerTick >= _upperTick || _lowerTick % tickSpacing != 0 || _upperTick % tickSpacing != 0)
             revert VaultErrors.InvalidTicksSpacing();
     }
 
+    // @notice internal function that withdraws liquidity from the AMM pool.
+    // @param liquidity the amount liquidity to withdraw from the AMM pool.
+    // @return burn0 amount of token0 received from burning liquidity.
+    // @return burn1 amount of token1 received from burning liquidity.
+    // @return fee0 amount of fee in token0 collected.
+    // @return fee1 amount of fee in token1 collected.
     function _withdraw(
         DataTypesLib.State storage state,
         uint128 liquidity
@@ -471,6 +572,7 @@ library LogicLib {
         fee1 = state.token1.balanceOf(address(this)) - preBalance1 - burn1;
     }
 
+    // @notice returns the amount of fee earned based on the feeGrowth factor.
     function _feesEarned(
         DataTypesLib.State storage state,
         bool isZero,
@@ -515,16 +617,18 @@ library LogicLib {
         }
     }
 
+    // @notice returns if the current of price of gho against collateral token from AMM does not deviate more than 0.5%
+    // from gho price against collateral token from Chainlink price oracle.
     function _isPriceWithinThrehold(DataTypesLib.State storage state) private view returns (bool) {
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
-
         (uint160 sqrtRatioX96, , , , , , ) = state.pool.slot0();
         uint256 priceFromUniswap = FullMath.mulDiv(
             uint256(sqrtRatioX96) * uint256(sqrtRatioX96),
             10 ** state.decimals0,
             1 << 192
         );
+
+        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
 
         uint256 priceFromOracle = state.isToken0GHO
             ? (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice)
@@ -534,17 +638,25 @@ library LogicLib {
         return priceRatio <= 10050 && priceRatio >= 9950;
     }
 
+    // @notice applies managing fee to the amount.
+    // @param amount the amount to apply the managing fee.
     function _applyManagingFee(DataTypesLib.State storage state, uint256 amount) private {
         if (state.isToken0GHO) state.managerBalance1 += (amount * state.managingFee) / 10_000;
         else state.managerBalance0 += (amount * state.managingFee) / 10_000;
     }
 
+    // @notice applies performance fee to the fee0 and fee1.
+    // @param fee0 the amount of fee0 to apply the performance fee.
+    // @param fee1 the amount of fee1 to apply the performance fee.
     function _applyPerformanceFee(DataTypesLib.State storage state, uint256 fee0, uint256 fee1) private {
         uint256 _performanceFee = state.performanceFee;
         state.managerBalance0 += (fee0 * _performanceFee) / 10_000;
         state.managerBalance1 += (fee1 * _performanceFee) / 10_000;
     }
 
+    // @notice deducts managing fee from the amount.
+    // @param amount the amount to apply the managing fee.
+    // @return amountAfterFee amount after deducting managing fee.
     function _netManagingFees(
         DataTypesLib.State storage state,
         uint256 amount
@@ -553,10 +665,15 @@ library LogicLib {
         amountAfterFee = amount - deduct;
     }
 
+    // @notice deducts performance fee from fee0 and fee1.
+    // @param rawFee0 the amount of fee0 to apply the performance fee.
+    // @param fee1 the amount of fee1 to apply the performance fee.
+    // @param fee0AfterDeduction fee0 after performance fee deduction.
+    // @param fee1AfterDeduction fee1 after performance fee deduction.
     function _netPerformanceFees(
         DataTypesLib.State storage state,
         uint256 rawFee0,
-        uint256 rawFee1
+        uint256 rawFee0
     ) private view returns (uint256 fee0AfterDeduction, uint256 fee1AfterDeduction) {
         uint256 _performanceFee = state.performanceFee;
         uint256 deduct0 = (rawFee0 * _performanceFee) / 10_000;

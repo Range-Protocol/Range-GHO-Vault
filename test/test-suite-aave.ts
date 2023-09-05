@@ -2,116 +2,53 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import {
   IERC20,
-  IUniswapV3Factory,
-  IUniswapV3Pool,
   RangeProtocolVault,
-  RangeProtocolFactory,
-  LogicLib,
 } from "../typechain";
-import {
-  bn,
-  encodePriceSqrt,
-  getInitializeData,
-  parseEther,
-  position,
-  setStorageAt,
-} from "./common";
-import { BigNumber } from "ethers";
+import {bn} from "./common";
+import { setupGHO } from "./setup-gho";
 
-let factory: RangeProtocolFactory;
 let vault: RangeProtocolVault;
-let logicLib: LogicLib;
-let uniV3Factory: IUniswapV3Factory;
-let univ3Pool: IUniswapV3Pool;
 let gho: IERC20;
-let usdc: IERC20;
-let debtGHO: IERC20;
-let aToken: IERC20;
+let collateral: IERC20;
+let ghoDebt: IERC20;
+let collateralAToken: IERC20;
 let manager: SignerWithAddress;
-const poolFee = 3000;
-const name = "Test Token";
-const symbol = "TT";
-const amount1: BigNumber = ethers.utils.parseUnits("1000", 6);
-let initializeData: any;
-const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
-const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
 const MAX_UINT = bn(
   "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 );
 
-describe("Test suite for Aave", () => {
+describe.only("Test suite for Aave", () => {
   before(async () => {
-    [manager] = await ethers.getSigners();
-    uniV3Factory = await ethers.getContractAt(
-      "IUniswapV3Factory",
-      "0x1F98431c8aD98523631AE4a59f267346ea31F984"
-    );
-    const RangeProtocolFactory = await ethers.getContractFactory(
-      "RangeProtocolFactory"
-    );
-    factory = (await RangeProtocolFactory.deploy(
-      uniV3Factory.address
-    )) as RangeProtocolFactory;
-    gho = await ethers.getContractAt("MockERC20", GHO);
-    usdc = await ethers.getContractAt("MockERC20", USDC);
-    debtGHO = await ethers.getContractAt(
-      "MockERC20",
-      "0x786dbff3f1292ae8f92ea68cf93c30b34b1ed04b"
-    );
-    aToken = await ethers.getContractAt(
-      "MockERC20",
-      "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c"
-    );
-    univ3Pool = (await ethers.getContractAt(
-      "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol:IUniswapV3Pool",
-      await uniV3Factory.getPool(gho.address, usdc.address, poolFee)
-    )) as IUniswapV3Pool;
-    initializeData = getInitializeData({
-      managerAddress: manager.address,
-      name,
-      symbol,
-      gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
-      poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
-    });
-    const LogicLib = await ethers.getContractFactory("LogicLib");
-    logicLib = await LogicLib.deploy();
-    const RangeProtocolVault = await ethers.getContractFactory(
-      "RangeProtocolVault",
-      {
-        libraries: {
-          LogicLib: logicLib.address,
-        },
-      }
-    );
-    const vaultImpl = (await RangeProtocolVault.deploy()) as RangeProtocolVault;
-    await factory.createVault(
-      usdc.address,
-      poolFee,
-      vaultImpl.address,
-      initializeData
-    );
-    const vaultAddress = await factory.getVaultAddresses(0, 0);
-    vault = (await ethers.getContractAt(
-      "RangeProtocolVault",
-      vaultAddress[0]
-    )) as RangeProtocolVault;
+    const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
+    const ghoDebtAddress = "0x786dbff3f1292ae8f92ea68cf93c30b34b1ed04b";
+    const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const aUSDC = "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c";
+    const poolAddressesProvider = "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e";
+    const collateralTokenPriceFeed =
+      "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6";
+    const ghoPriceFeed = "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC";
 
-    await setStorageAt(
-      USDC,
-      ethers.utils.keccak256(
-        ethers.utils.defaultAbiCoder.encode(
-          ["address", "uint256"],
-          [manager.address, 9]
-        )
-      ),
-      ethers.utils.hexlify(ethers.utils.zeroPad("0x54B40B1F852BDA000000", 32))
-    );
+    [manager] = await ethers.getSigners();
+    ({ gho, collateral, ghoDebt, collateralAToken, vault } = await setupGHO({
+      managerAddress: manager.address,
+      vaultName: "Test Vault",
+      vaultSymbol: "TV",
+      poolFee: 3000,
+      ammFactoryAddress: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      collateralAddress: USDC,
+      collateralATokenAddress: aUSDC,
+      ghoAddress: GHO,
+      ghoDebtAddress: ghoDebtAddress,
+      poolAddressesProvider,
+      collateralTokenPriceFeed,
+      ghoPriceFeed,
+    }));
   });
 
   it("Test suite", async () => {
     const usdcDepositAmount = ethers.utils.parseUnits("100000", 6);
-    await usdc.approve(vault.address, usdcDepositAmount);
+    await collateral.approve(vault.address, usdcDepositAmount);
     await vault.mint(usdcDepositAmount);
 
     console.log(
@@ -120,12 +57,12 @@ describe("Test suite for Aave", () => {
     );
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
 
-    await vault.supplyCollateral(usdcDepositAmount.div(bn(2)));
-    const ghoMintAmount = usdcDepositAmount
-      .div(bn(2))
+    const supplyingCollateral = usdcDepositAmount.div(bn(2));
+    await vault.supplyCollateral(supplyingCollateral);
+    const ghoMintAmount = supplyingCollateral
       .mul(bn(10).pow(12))
       .mul(70)
       .div(100);
@@ -135,7 +72,7 @@ describe("Test suite for Aave", () => {
     );
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -145,18 +82,16 @@ describe("Test suite for Aave", () => {
     const lowerTick = -276480;
     const upperTick = -276300;
 
-    const usdcBalance = await usdc.balanceOf(vault.address);
+    const usdcBalance = await collateral.balanceOf(vault.address);
     const ghoBalance = await gho.balanceOf(vault.address);
 
-    const data = await (
-      await vault.addLiquidity(lowerTick, upperTick, ghoBalance, usdcBalance)
-    ).wait();
+    await vault.addLiquidity(lowerTick, upperTick, ghoBalance, usdcBalance);
     console.log(
       "Vault balance after adding maximum liquidity to uniswap v3 0.3% pool"
     );
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -171,7 +106,7 @@ describe("Test suite for Aave", () => {
     console.log("Vault balance after swapping 1000 usdc to gho");
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -182,7 +117,7 @@ describe("Test suite for Aave", () => {
     console.log("Vault balance after removing liquidity from uniswap");
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -195,7 +130,7 @@ describe("Test suite for Aave", () => {
     console.log("Vault balance after paying back debt");
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -206,7 +141,7 @@ describe("Test suite for Aave", () => {
     console.log("Vault balance after withdrawing collateral");
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
@@ -218,16 +153,20 @@ describe("Test suite for Aave", () => {
     const _ghoBalance = await gho.balanceOf(vault.address);
     await vault.swap(true, _ghoBalance, 4295128740);
     console.log(
-      (await vault.getUnderlyingBalance()).toString(),
+      (await vault.getBalanceInCollateralToken()).toString(),
       (await vault.balanceOf(manager.address)).toString(),
       (await vault.totalSupply()).toString()
     );
-    // await vault.burn(usdcDepositAmount);
+    console.log((await vault.balanceOf(manager.address)).toString());
+    await vault.burn(await vault.balanceOf(manager.address));
+
+    console.log((await vault.managerBalance0()).toString());
+    console.log((await vault.managerBalance1()).toString());
 
     console.log("Vault balance after position is closed");
     console.log(
       "Vault USDC balance: ",
-      (await usdc.balanceOf(vault.address)).toString()
+      (await collateral.balanceOf(vault.address)).toString()
     );
     console.log(
       "Vault GHO balance: ",
