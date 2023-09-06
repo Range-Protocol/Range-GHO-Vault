@@ -667,13 +667,13 @@ library LogicLib {
 
     // @notice deducts performance fee from fee0 and fee1.
     // @param rawFee0 the amount of fee0 to apply the performance fee.
-    // @param fee1 the amount of fee1 to apply the performance fee.
+    // @param rawFee1 the amount of fee1 to apply the performance fee.
     // @param fee0AfterDeduction fee0 after performance fee deduction.
     // @param fee1AfterDeduction fee1 after performance fee deduction.
     function _netPerformanceFees(
         DataTypesLib.State storage state,
         uint256 rawFee0,
-        uint256 rawFee0
+        uint256 rawFee1
     ) private view returns (uint256 fee0AfterDeduction, uint256 fee1AfterDeduction) {
         uint256 _performanceFee = state.performanceFee;
         uint256 deduct0 = (rawFee0 * _performanceFee) / 10_000;
