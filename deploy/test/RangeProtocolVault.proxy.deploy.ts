@@ -1,5 +1,5 @@
 import { ethers, network } from "hardhat";
-import {getInitializeData} from "../../test/common";
+import { getInitializeData } from "../../test/common";
 
 async function main() {
   const managerAddress = "0x9F78223D10885bF1Cc0675631b4e2BE507049d5d"; // updated.
@@ -19,7 +19,9 @@ async function main() {
     name,
     symbol,
     gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
-    poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
+    poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    collateralTokenPriceFeed: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+    ghoPriceFeed: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
   });
   // network.config.accounts = "remote";
   // await network.provider.send(
