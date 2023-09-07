@@ -256,6 +256,24 @@ contract RangeProtocolVault is
         LogicLib.burnGHO(state, burnAmount);
     }
 
+    function rebalance(bytes[] memory calldatas) external override onlyManager returns (bytes[] memory returndatas) {
+        returndatas = new bytes[](calldatas.length);
+        for (uint256 i = 0; i < calldatas.length; i++) {
+            (bool success, bytes memory returndata) = address(this).delegatecall(calldatas[i]);
+            if (!success) {
+                if (returndata.length > 0) {
+                    assembly {
+                        revert(add(32, returndata), mload(returndata))
+                    }
+                }
+                revert VaultErrors.MulticallFailed();
+            }
+            returndatas[i] = returndata;
+        }
+
+        emit PoolRebalanced();
+    }
+
     /**
      * @notice returns Aave position data.
      * @return totalCollateralBase total collateral supplied.

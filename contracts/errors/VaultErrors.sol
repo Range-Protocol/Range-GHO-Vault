@@ -14,4 +14,5 @@ library VaultErrors {
     error LiquidityAlreadyAdded();
     error OnlyVaultAllowed();
     error PriceNotWithinThrehold();
+    error MulticallFailed();
 }

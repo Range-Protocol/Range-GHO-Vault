@@ -38,6 +38,7 @@ interface IRangeProtocolVault is
     event CollateralWithdrawn(address token, uint256 amount);
     event GHOMinted(uint256 amount);
     event GHOBurned(uint256 amount);
+    event PoolRebalanced();
 
     // @notice intializes the vault.
     function initialize(address _pool, int24 _tickSpacing, bytes memory data) external;
@@ -107,4 +108,7 @@ interface IRangeProtocolVault is
 
     // @notice payback the debt in GHO token to Aave.
     function burnGHO(uint256 burnAmount) external;
+
+    // @notice multicall function to rebalance the AMM pool.
+    function rebalance(bytes[] memory calldatas) external returns (bytes[] memory returndatas);
 }
