@@ -10,7 +10,7 @@ async function main() {
   const vaultImplAddress = ""; // to be updated.
   const token0 = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"; // to be updated.
   const token1 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // to be updated.
-  const fee = 3000; // To be updated.
+  const fee = 500;
   const name = ""; // To be updated.
   const symbol = ""; // To be updated.
 

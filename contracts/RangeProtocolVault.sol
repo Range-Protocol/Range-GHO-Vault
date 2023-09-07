@@ -88,7 +88,7 @@ contract RangeProtocolVault is
         } else {
             state.vaultDecimals = decimals0;
         }
-        // Managing fee is 0% at the time vault initialization.
+        // Managing fee is 0.1% at the time vault initialization.
         LogicLib.updateFees(state, 10, 250);
     }
 
