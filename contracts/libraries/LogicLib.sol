@@ -11,7 +11,6 @@ import {FullMath} from "../uniswap/FullMath.sol";
 import {TickMath} from "../uniswap/TickMath.sol";
 import {DataTypesLib} from "./DataTypesLib.sol";
 import {IRangeProtocolVault} from "../interfaces/IRangeProtocolVault.sol";
-import {IPriceOracleExtended} from "../interfaces/IPriceOracleExtended.sol";
 import {VaultErrors} from "../errors/VaultErrors.sol";
 
 /**
@@ -375,9 +374,9 @@ library LogicLib {
         (vars.decimals0, vars.decimals1) = (state.decimals0, state.decimals1);
 
         if (state.isToken0GHO) {
-            vars.token0BalanceSigned = int256(
-                vars.amount0FromPool + state.token0.balanceOf(address(this)) - vars.amount0FromAave
-            );
+            vars.token0BalanceSigned =
+                int256(vars.amount0FromPool + state.token0.balanceOf(address(this))) -
+                int256(vars.amount0FromAave);
             vars.token1BalanceSigned = int256(
                 vars.amount1FromPool + state.token1.balanceOf(address(this)) + vars.amount1FromAave
             );
@@ -391,9 +390,9 @@ library LogicLib {
                 vars.token1BalanceSigned -= int256(ghoDeficitInCollateralToken);
             }
         } else {
-            vars.token0BalanceSigned = int256(
-                vars.amount0FromPool + state.token0.balanceOf(address(this)) + vars.amount0FromAave
-            );
+            vars.token0BalanceSigned =
+                int256(vars.amount0FromPool + state.token0.balanceOf(address(this))) +
+                int256(vars.amount0FromAave);
             vars.token1BalanceSigned = int256(
                 vars.amount1FromPool + state.token1.balanceOf(address(this)) - vars.amount1FromAave
             );
@@ -486,16 +485,14 @@ library LogicLib {
         (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(state.poolAddressesProvider.getPool())
             .getUserAccountData(address(this));
 
-        uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(state.poolAddressesProvider.getPriceOracle())
-            .BASE_CURRENCY_UNIT();
         (amount0, amount1) = state.isToken0GHO
             ? (
-                (totalDebtBase * 10 ** state.decimals0) / ghoPrice / BASE_CURRENCY_UNIT,
-                (totalCollateralBase * 10 ** state.decimals1) / collateralTokenPrice / BASE_CURRENCY_UNIT
+                (totalDebtBase * 10 ** state.decimals0) / ghoPrice,
+                (totalCollateralBase * 10 ** state.decimals1) / collateralTokenPrice
             )
             : (
-                (totalCollateralBase * 10 ** state.decimals0) / collateralTokenPrice / BASE_CURRENCY_UNIT,
-                (totalDebtBase * 10 ** state.decimals1) / ghoPrice / BASE_CURRENCY_UNIT
+                (totalCollateralBase * 10 ** state.decimals0) / collateralTokenPrice,
+                (totalDebtBase * 10 ** state.decimals1) / ghoPrice
             );
     }
 
