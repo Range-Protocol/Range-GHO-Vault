@@ -32,8 +32,7 @@ library DataTypesLib {
         uint8 vaultDecimals;
         uint16 managingFee;
         uint16 performanceFee;
-        uint256 managerBalance0;
-        uint256 managerBalance1;
+        uint256 managerBalance;
         IPoolAddressesProvider poolAddressesProvider;
         AggregatorV3Interface collateralTokenPriceFeed;
         AggregatorV3Interface ghoPriceFeed;

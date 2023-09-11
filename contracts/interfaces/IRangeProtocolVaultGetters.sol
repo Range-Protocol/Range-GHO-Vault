@@ -39,11 +39,8 @@ interface IRangeProtocolVaultGetters {
     // @return returns performance fee percentage out of 10_000.
     function performanceFee() external view returns (uint16);
 
-    // @return returns manager balance in token0.
-    function managerBalance0() external view returns (uint256);
-
-    // @return returns manager balance in token1.
-    function managerBalance1() external view returns (uint256);
+    // @return returns manager balance in token.
+    function managerBalance() external view returns (uint256);
 
     // @return returns user's vault exposure in token0 and token1.
     function userVaults(address user) external view returns (DataTypesLib.UserVault memory);

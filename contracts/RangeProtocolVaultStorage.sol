@@ -53,12 +53,8 @@ abstract contract RangeProtocolVaultStorage is IRangeProtocolVault {
         return state.performanceFee;
     }
 
-    function managerBalance0() external view override returns (uint256) {
-        return state.managerBalance0;
-    }
-
-    function managerBalance1() external view override returns (uint256) {
-        return state.managerBalance1;
+    function managerBalance() external view override returns (uint256) {
+        return state.managerBalance;
     }
 
     function userVaults(address user) external view override returns (DataTypesLib.UserVault memory) {

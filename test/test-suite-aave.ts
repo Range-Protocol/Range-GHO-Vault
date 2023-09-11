@@ -67,6 +67,7 @@ describe.only("Test suite for Aave", () => {
       .mul(70)
       .div(100);
     await vault.mintGHO(ghoMintAmount);
+    await vault.getBalanceInCollateralToken();
     console.log(
       "After supplying 50k usdc to aave as supply and borrowing 35k GHO"
     );
@@ -86,6 +87,8 @@ describe.only("Test suite for Aave", () => {
     const ghoBalance = await gho.balanceOf(vault.address);
 
     await vault.addLiquidity(lowerTick, upperTick, ghoBalance, usdcBalance);
+    await vault.getBalanceInCollateralToken();
+
     console.log(
       "Vault balance after adding maximum liquidity to uniswap v3 0.3% pool"
     );
@@ -160,8 +163,7 @@ describe.only("Test suite for Aave", () => {
     console.log((await vault.balanceOf(manager.address)).toString());
     await vault.burn(await vault.balanceOf(manager.address));
 
-    console.log((await vault.managerBalance0()).toString());
-    console.log((await vault.managerBalance1()).toString());
+    console.log((await vault.managerBalance()).toString());
 
     console.log("Vault balance after position is closed");
     console.log(

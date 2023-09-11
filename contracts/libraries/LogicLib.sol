@@ -11,6 +11,7 @@ import {FullMath} from "../uniswap/FullMath.sol";
 import {TickMath} from "../uniswap/TickMath.sol";
 import {DataTypesLib} from "./DataTypesLib.sol";
 import {IRangeProtocolVault} from "../interfaces/IRangeProtocolVault.sol";
+import {IPriceOracleExtended} from "../interfaces/IPriceOracleExtended.sol";
 import {VaultErrors} from "../errors/VaultErrors.sol";
 
 /**
@@ -226,13 +227,10 @@ library LogicLib {
 
     // @notice called by manager to collect fee from the vault.
     function collectManager(DataTypesLib.State storage state, address manager) external {
-        uint256 balance0 = state.managerBalance0;
-        uint256 balance1 = state.managerBalance1;
-        state.managerBalance0 = 0;
-        state.managerBalance1 = 0;
+        uint256 balance = state.managerBalance;
+        state.managerBalance = 0;
 
-        if (balance0 != 0) state.token0.safeTransfer(manager, balance0);
-        if (balance1 != 0) state.token1.safeTransfer(manager, balance1);
+        if (balance != 0) state.token1.safeTransfer(manager, balance);
     }
 
     // @notice called by the manager to update the fees.
@@ -343,10 +341,8 @@ library LogicLib {
         uint256 amount1FromPool;
         uint256 amount0FromAave;
         uint256 amount1FromAave;
-        int256 token0BalanceSigned;
-        int256 token1BalanceSigned;
-        uint256 decimals0;
-        uint256 decimals1;
+        int256 token0Balance;
+        int256 token1Balance;
     }
 
     // @notice returns vault asset's balance in collateral token. It gets balances from the following three places.
@@ -360,72 +356,34 @@ library LogicLib {
     // vault balance.
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
-
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
-        (vars.amount0FromAave, vars.amount1FromAave) = getUnderlyingBalancesFromAave(
-            state,
-            uint256(ghoPrice),
-            uint256(collateralPrice)
+        (vars.amount0FromAave, vars.amount1FromAave) = getUnderlyingBalancesFromAave(state);
+
+        // We token0 is always going to be GHO since the GHO will only be created with USDC, DAI and LUSD tokens and
+        // these tokens' addresses' uint256 representation on Ethereum mainnet is greater than GHO's address representation.
+        vars.token0Balance =
+            int256(vars.amount0FromPool + state.token0.balanceOf(address(this))) -
+            int256(vars.amount0FromAave);
+
+        vars.token1Balance = int256(
+            vars.amount1FromPool + state.token1.balanceOf(address(this)) + vars.amount1FromAave
         );
-        (vars.decimals0, vars.decimals1) = (state.decimals0, state.decimals1);
 
-        if (state.isToken0GHO) {
-            vars.token0BalanceSigned =
-                int256(vars.amount0FromPool + state.token0.balanceOf(address(this))) -
-                int256(vars.amount0FromAave);
-            vars.token1BalanceSigned = int256(
-                vars.amount1FromPool + state.token1.balanceOf(address(this)) + vars.amount1FromAave
-            );
+        int256 managerBalance = int256(state.managerBalance);
+        if (vars.token1Balance > managerBalance) vars.token1Balance -= managerBalance;
 
-            if (vars.token0BalanceSigned < 0) {
-                uint256 ghoDeficitInCollateralToken = (uint256(-vars.token0BalanceSigned) *
-                    10 ** vars.decimals1 *
-                    uint256(ghoPrice)) /
-                    uint256(collateralPrice) /
-                    10 ** vars.decimals0;
-                vars.token1BalanceSigned -= int256(ghoDeficitInCollateralToken);
-            }
-        } else {
-            vars.token0BalanceSigned =
-                int256(vars.amount0FromPool + state.token0.balanceOf(address(this))) +
-                int256(vars.amount0FromAave);
-            vars.token1BalanceSigned = int256(
-                vars.amount1FromPool + state.token1.balanceOf(address(this)) - vars.amount1FromAave
-            );
+        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
 
-            if (vars.token1BalanceSigned < 0) {
-                uint256 ghoDeficitInCollateralToken = (uint256(-vars.token1BalanceSigned) *
-                    10 ** vars.decimals0 *
-                    uint256(ghoPrice)) /
-                    uint256(collateralPrice) /
-                    10 ** vars.decimals1;
-                vars.token0BalanceSigned -= int256(ghoDeficitInCollateralToken);
-            }
-        }
+        int256 amountSigned = vars.token1Balance +
+            ((vars.token0Balance * ghoPrice * int256(10 ** state.decimals1)) /
+                collateralPrice /
+                int256(10 ** state.decimals0));
 
-        uint256 amount0 = vars.token0BalanceSigned > int256(state.managerBalance0)
-            ? uint256(vars.token0BalanceSigned) - state.managerBalance0
-            : 0;
-        uint256 amount1 = vars.token1BalanceSigned > int256(state.managerBalance1)
-            ? uint256(vars.token1BalanceSigned) - state.managerBalance1
-            : 0;
-
-        if (state.isToken0GHO) {
-            amount0 =
-                (amount0 * 10 ** state.decimals1 * uint256(ghoPrice)) /
-                uint256(collateralPrice) /
-                10 ** state.decimals0;
-        } else {
-            amount1 =
-                (amount1 * 10 ** state.decimals0 * uint256(ghoPrice)) /
-                uint256(collateralPrice) /
-                10 ** state.decimals1;
-        }
-        return amount0 + amount1;
+        if (amountSigned < 0) revert VaultErrors.DebtGreaterThanAssets();
+        return uint256(amountSigned);
     }
 
     // @notice returns underlying balance in collateral token based on the shares amount passed.
@@ -478,21 +436,29 @@ library LogicLib {
     // @param amount0 collateral supplied to Aave if token0 is collateral token else gho amount borrowed.
     // @param amount1 collateral supplied to Aave if token1 is collateral token else gho amount borrowed.
     function getUnderlyingBalancesFromAave(
-        DataTypesLib.State storage state,
-        uint256 ghoPrice,
-        uint256 collateralTokenPrice
+        DataTypesLib.State storage state
     ) public view returns (uint256 amount0, uint256 amount1) {
         (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(state.poolAddressesProvider.getPool())
             .getUserAccountData(address(this));
 
+        uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(state.poolAddressesProvider.getPriceOracle())
+            .BASE_CURRENCY_UNIT();
+
+        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        uint8 priceDecimals = state.collateralTokenPriceFeed.decimals();
+
         (amount0, amount1) = state.isToken0GHO
             ? (
-                (totalDebtBase * 10 ** state.decimals0) / ghoPrice,
-                (totalCollateralBase * 10 ** state.decimals1) / collateralTokenPrice
+                (totalDebtBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT,
+                (totalCollateralBase * 10 ** state.decimals1 * 10 ** priceDecimals) /
+                    uint256(collateralPrice) /
+                    BASE_CURRENCY_UNIT
             )
             : (
-                (totalCollateralBase * 10 ** state.decimals0) / collateralTokenPrice,
-                (totalDebtBase * 10 ** state.decimals1) / ghoPrice
+                (totalCollateralBase * 10 ** state.decimals0 * 10 ** priceDecimals) /
+                    uint256(collateralPrice) /
+                    BASE_CURRENCY_UNIT,
+                (totalDebtBase * 10 ** state.decimals1) / BASE_CURRENCY_UNIT
             );
     }
 
@@ -638,8 +604,7 @@ library LogicLib {
     // @notice applies managing fee to the amount.
     // @param amount the amount to apply the managing fee.
     function _applyManagingFee(DataTypesLib.State storage state, uint256 amount) private {
-        if (state.isToken0GHO) state.managerBalance1 += (amount * state.managingFee) / 10_000;
-        else state.managerBalance0 += (amount * state.managingFee) / 10_000;
+        state.managerBalance += (amount * state.managingFee) / 10_000;
     }
 
     // @notice applies performance fee to the fee0 and fee1.
@@ -647,8 +612,11 @@ library LogicLib {
     // @param fee1 the amount of fee1 to apply the performance fee.
     function _applyPerformanceFee(DataTypesLib.State storage state, uint256 fee0, uint256 fee1) private {
         uint256 _performanceFee = state.performanceFee;
-        state.managerBalance0 += (fee0 * _performanceFee) / 10_000;
-        state.managerBalance1 += (fee1 * _performanceFee) / 10_000;
+        state.managerBalance += (fee1 * _performanceFee) / 10_000;
+
+        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
+        state.managerBalance += (fee0 * uint256(ghoPrice) * _performanceFee) / uint256(collateralPrice) / 10_000;
     }
 
     // @notice deducts managing fee from the amount.

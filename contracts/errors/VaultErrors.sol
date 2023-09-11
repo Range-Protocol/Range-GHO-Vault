@@ -15,4 +15,5 @@ library VaultErrors {
     error OnlyVaultAllowed();
     error PriceNotWithinThrehold();
     error MulticallFailed();
+    error DebtGreaterThanAssets();
 }
