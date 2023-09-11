@@ -26,7 +26,6 @@ library DataTypesLib {
         int24 upperTick;
         int24 tickSpacing;
         bool inThePosition;
-        bool isToken0GHO;
         uint8 decimals0;
         uint8 decimals1;
         uint8 vaultDecimals;

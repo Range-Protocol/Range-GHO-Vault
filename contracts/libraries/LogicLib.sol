@@ -445,21 +445,11 @@ library LogicLib {
             .BASE_CURRENCY_UNIT();
 
         (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        uint8 priceDecimals = state.collateralTokenPriceFeed.decimals();
-
-        (amount0, amount1) = state.isToken0GHO
-            ? (
-                (totalDebtBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT,
-                (totalCollateralBase * 10 ** state.decimals1 * 10 ** priceDecimals) /
-                    uint256(collateralPrice) /
-                    BASE_CURRENCY_UNIT
-            )
-            : (
-                (totalCollateralBase * 10 ** state.decimals0 * 10 ** priceDecimals) /
-                    uint256(collateralPrice) /
-                    BASE_CURRENCY_UNIT,
-                (totalDebtBase * 10 ** state.decimals1) / BASE_CURRENCY_UNIT
-            );
+        amount0 = (totalDebtBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT;
+        amount1 =
+            (totalCollateralBase * 10 ** state.decimals1 * 10 ** state.collateralTokenPriceFeed.decimals()) /
+            uint256(collateralPrice) /
+            BASE_CURRENCY_UNIT;
     }
 
     // @notice transfer hook to transfer the exposure from sender to recipient.
@@ -593,10 +583,7 @@ library LogicLib {
         (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
         (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
 
-        uint256 priceFromOracle = state.isToken0GHO
-            ? (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice)
-            : (10 ** state.decimals0 * uint256(collateralPrice)) / uint256(ghoPrice);
-
+        uint256 priceFromOracle = (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice);
         uint256 priceRatio = (priceFromUniswap * 10000) / priceFromOracle;
         return priceRatio <= 10050 && priceRatio >= 9950;
     }

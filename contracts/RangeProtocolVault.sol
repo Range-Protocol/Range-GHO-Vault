@@ -82,12 +82,10 @@ contract RangeProtocolVault is
         state.collateralTokenPriceFeed = AggregatorV3Interface(_collateralTokenPriceFeed);
         state.ghoPriceFeed = AggregatorV3Interface(_ghoPriceFeed);
 
-        if (address(token0) == _gho) {
-            state.isToken0GHO = true;
-            state.vaultDecimals = decimals1;
-        } else {
-            state.vaultDecimals = decimals0;
-        }
+        state.vaultDecimals = address(token0) == _gho
+            ? state.vaultDecimals = decimals1
+            : state.vaultDecimals = decimals0;
+
         // Managing fee is 0.1% at the time vault initialization.
         LogicLib.updateFees(state, 10, 250);
     }

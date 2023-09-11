@@ -41,10 +41,6 @@ abstract contract RangeProtocolVaultStorage is IRangeProtocolVault {
         return state.inThePosition;
     }
 
-    function isToken0GHO() external view override returns (bool) {
-        return state.isToken0GHO;
-    }
-
     function managingFee() external view override returns (uint16) {
         return state.managingFee;
     }
@@ -74,10 +70,10 @@ abstract contract RangeProtocolVaultStorage is IRangeProtocolVault {
     }
 
     function gho() external view override returns (address) {
-        return state.isToken0GHO ? address(state.token0) : address(state.token1);
+        return address(state.token0);
     }
 
     function collateralToken() external view override returns (address) {
-        return state.isToken0GHO ? address(state.token1) : address(state.token0);
+        return address(state.token1);
     }
 }

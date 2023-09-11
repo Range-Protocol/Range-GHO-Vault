@@ -30,9 +30,6 @@ interface IRangeProtocolVaultGetters {
     // @return true if the vault has an opened position in the AMM pool.
     function inThePosition() external view returns (bool);
 
-    // @return true if token0 is GHO.
-    function isToken0GHO() external view returns (bool);
-
     // @return returns managing fee percentage out of 10_000.
     function managingFee() external view returns (uint16);
 
