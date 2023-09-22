@@ -56,4 +56,25 @@ interface IRangeProtocolVaultGetters {
 
     // @return address of collateral token.
     function collateralToken() external view returns (address);
+
+    // @notice returns collateral deposited to Aave in collateral token and debt owed in gho.
+    function getUnderlyingBalancesFromAave() external view returns (uint256, uint256);
+
+    // @notice returns the underlying balance of vault in collateral token.
+    function getBalanceInCollateralToken() external view returns (uint256 amount);
+
+    // @notice returns gho and collateral balances from uni pool.
+    function getUnderlyingBalancesFromPool() external view returns (uint256, uint256);
+
+    // @notice returns the underlying balance based on the amount of {shares}.
+    function getUnderlyingBalanceByShare(uint256 shares) external view returns (uint256 amount);
+
+    // @notice returns currently unclaimed fee in the contract.
+    function getCurrentFees() external view returns (uint256 fee0, uint256 fee1);
+
+    // @notice returns current position id of the contract.
+    function getPositionID() external view returns (bytes32 positionID);
+
+    // @notice returns users vaults based on the passed indexes.
+    function getUserVaults(uint256 fromIdx, uint256 toIdx) external view returns (DataTypesLib.UserVaultInfo[] memory);
 }

@@ -64,6 +64,7 @@
     "@aave/core-v3": "^1.18.0",
     "@aave/periphery-v3": "^2.4.1",
     "@chainlink/contracts": "^0.6.1",
+    "decimal.js": "^10.4.3",
     "hardhat-contract-sizer": "^2.10.0"
   }
 }

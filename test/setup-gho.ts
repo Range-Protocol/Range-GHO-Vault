@@ -32,7 +32,9 @@ export const setupGHO: any = async ({
   ghoDebtAddress: string;
   poolAddressesProvider: string;
   collateralTokenPriceFeed: string;
+  collateralPriceOracleHeartbeat: number;
   ghoPriceFeed: string;
+  ghoPriceOracleHeartbeat: number;
 }) => {
   const RangeFactory = await ethers.getContractFactory("RangeProtocolFactory");
   const rangeFactory = (await RangeFactory.deploy(
@@ -74,7 +76,9 @@ export const setupGHO: any = async ({
     gho: ghoAddress,
     poolAddressesProvider,
     collateralTokenPriceFeed,
+    collateralPriceOracleHeartbeat: 86400,
     ghoPriceFeed,
+    ghoPriceOracleHeartbeat: 86400,
   });
 
   await rangeFactory.createVault(

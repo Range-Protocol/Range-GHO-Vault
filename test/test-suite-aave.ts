@@ -1,11 +1,9 @@
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import {
-  IERC20,
-  RangeProtocolVault,
-} from "../typechain";
-import {bn} from "./common";
+import { IERC20, RangeProtocolVault } from "../typechain";
+import { bn } from "./common";
 import { setupGHO } from "./setup-gho";
+import { Decimal } from "decimal.js";
 
 let vault: RangeProtocolVault;
 let gho: IERC20;
@@ -18,7 +16,7 @@ const MAX_UINT = bn(
   "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 );
 
-describe.only("Test suite for Aave", () => {
+describe("Test suite for Aave", () => {
   before(async () => {
     const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
     const ghoDebtAddress = "0x786dbff3f1292ae8f92ea68cf93c30b34b1ed04b";
@@ -34,7 +32,7 @@ describe.only("Test suite for Aave", () => {
       managerAddress: manager.address,
       vaultName: "Test Vault",
       vaultSymbol: "TV",
-      poolFee: 3000,
+      poolFee: 500,
       ammFactoryAddress: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
       collateralAddress: USDC,
       collateralATokenAddress: aUSDC,
@@ -42,7 +40,9 @@ describe.only("Test suite for Aave", () => {
       ghoDebtAddress: ghoDebtAddress,
       poolAddressesProvider,
       collateralTokenPriceFeed,
+      collateralPriceOracleHeartbeat: 86400,
       ghoPriceFeed,
+      ghoPriceOracleHeartbeat: 86400,
     }));
   });
 
@@ -85,8 +85,48 @@ describe.only("Test suite for Aave", () => {
 
     const usdcBalance = await collateral.balanceOf(vault.address);
     const ghoBalance = await gho.balanceOf(vault.address);
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const MockLiquidityAmounts = await ethers.getContractFactory(
+      "MockLiquidityAmounts"
+    );
+    const mockLiquidityAmounts = await MockLiquidityAmounts.deploy();
 
-    await vault.addLiquidity(lowerTick, upperTick, ghoBalance, usdcBalance);
+    const pool = await ethers.getContractAt(
+      "IUniswapV3Pool",
+      await vault.pool()
+    );
+    const { sqrtPriceX96 } = await pool.slot0();
+    const sqrtPriceA = new Decimal(1.0001)
+      .pow(lowerTick)
+      .sqrt()
+      .mul(new Decimal(2).pow(96))
+      .round()
+      .toFixed();
+    const sqrtPriceB = new Decimal(1.0001)
+      .pow(upperTick)
+      .sqrt()
+      .mul(new Decimal(2).pow(96))
+      .round()
+      .toFixed();
+    const liquidityToAdd = await mockLiquidityAmounts.getLiquidityForAmounts(
+      sqrtPriceX96,
+      sqrtPriceA,
+      sqrtPriceB,
+      ghoBalance,
+      usdcBalance
+    );
+    const { amount0: ghoToAdd, amount1: usdcToAdd } =
+      await mockLiquidityAmounts.getAmountsForLiquidity(
+        sqrtPriceX96,
+        sqrtPriceA,
+        sqrtPriceB,
+        liquidityToAdd
+      );
+
+    await vault.addLiquidity(lowerTick, upperTick, ghoToAdd, usdcToAdd, [
+      ghoToAdd.mul(9900).div(10000),
+      usdcToAdd.mul(9900).div(10000),
+    ]);
     await vault.getBalanceInCollateralToken();
 
     console.log(
@@ -104,7 +144,8 @@ describe.only("Test suite for Aave", () => {
     await vault.swap(
       false,
       ethers.utils.parseUnits("1000", 6),
-      bn("146144670348521010328727305220398882237872397034")
+      bn("146144670348521010328727305220398882237872397034"),
+      0
     );
     console.log("Vault balance after swapping 1000 usdc to gho");
     console.log(
@@ -154,7 +195,7 @@ describe.only("Test suite for Aave", () => {
       await vault.getAavePositionData());
     console.log(totalCollateralBase.toString(), totalDebtBase.toString());
     const _ghoBalance = await gho.balanceOf(vault.address);
-    await vault.swap(true, _ghoBalance, 4295128740);
+    await vault.swap(true, _ghoBalance, 4295128740, 0);
     console.log(
       (await vault.getBalanceInCollateralToken()).toString(),
       (await vault.balanceOf(manager.address)).toString(),

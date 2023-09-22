@@ -13,7 +13,11 @@ library VaultErrors {
     error OnlyFactoryAllowed();
     error LiquidityAlreadyAdded();
     error OnlyVaultAllowed();
-    error PriceNotWithinThrehold();
+    error PriceNotWithinThreshold();
     error MulticallFailed();
     error DebtGreaterThanAssets();
+    error OraclePriceIsOutdated(address oracle);
+    error ZeroManagerAddress();
+    error TokenZeroIsNotGHO();
+    error SlippageExceedThreshold();
 }

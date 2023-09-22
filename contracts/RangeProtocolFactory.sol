@@ -82,7 +82,7 @@ contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
     function getVaultAddresses(uint256 startIdx, uint256 endIdx) external view returns (address[] memory vaultList) {
         vaultList = new address[](endIdx - startIdx + 1);
         for (uint256 i = startIdx; i <= endIdx; i++) {
-            vaultList[i] = _vaultsList[i];
+            vaultList[i - startIdx] = _vaultsList[i];
         }
     }
 

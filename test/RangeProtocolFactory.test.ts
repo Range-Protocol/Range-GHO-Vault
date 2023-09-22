@@ -32,7 +32,10 @@ describe("RangeProtocolFactory", () => {
   before(async function () {
     [owner, nonOwner, newOwner] = await ethers.getSigners();
 
-    uniV3Factory = await ethers.getContractAt("IUniswapV3Factory", "0x1F98431c8aD98523631AE4a59f267346ea31F984");
+    uniV3Factory = await ethers.getContractAt(
+      "IUniswapV3Factory",
+      "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+    );
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const RangeProtocolFactory = await ethers.getContractFactory(
@@ -54,12 +57,12 @@ describe("RangeProtocolFactory", () => {
     const logicLib = await LogicLib.deploy();
 
     const RangeProtocolVault = await ethers.getContractFactory(
-        "RangeProtocolVault",
-        {
-          libraries: {
-            LogicLib: logicLib.address,
-          },
-        }
+      "RangeProtocolVault",
+      {
+        libraries: {
+          LogicLib: logicLib.address,
+        },
+      }
     );
     vaultImpl = (await RangeProtocolVault.deploy()) as RangeProtocolVault;
 
@@ -68,7 +71,11 @@ describe("RangeProtocolFactory", () => {
       name,
       symbol,
       gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
-      poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
+      poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+      collateralTokenPriceFeed: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+      collateralPriceOracleHeartbeat: 86400,
+      ghoPriceFeed: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+      ghoPriceOracleHeartbeat: 86400,
     });
   });
 
@@ -105,12 +112,7 @@ describe("RangeProtocolFactory", () => {
     await expect(
       factory
         .connect(nonOwner)
-        .createVault(
-          token1.address,
-          poolFee,
-          vaultImpl.address,
-          initializeData
-        )
+        .createVault(token1.address, poolFee, vaultImpl.address, initializeData)
     ).to.be.revertedWith("Ownable: caller is not the owner");
   });
 

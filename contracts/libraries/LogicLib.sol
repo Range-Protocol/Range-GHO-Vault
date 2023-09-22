@@ -6,6 +6,7 @@ import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {SafeCastUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {LiquidityAmounts} from "../uniswap/LiquidityAmounts.sol";
 import {FullMath} from "../uniswap/FullMath.sol";
 import {TickMath} from "../uniswap/TickMath.sol";
@@ -50,20 +51,7 @@ library LogicLib {
     event CollateralWithdrawn(address token, uint256 amount);
     event GHOMinted(uint256 amount);
     event GHOBurned(uint256 amount);
-
-    // @notice updates the tick range upon vault deployment or when the vault is out of position and totalSupply is zero.
-    // It can only be called by the manager.
-    // @param _lowerTick lower tick of the position.
-    // @param _upperTick upper tick of the position.
-    function updateTicks(DataTypesLib.State storage state, int24 _lowerTick, int24 _upperTick) external {
-        if (IRangeProtocolVault(address(this)).totalSupply() != 0 || state.inThePosition)
-            revert VaultErrors.NotAllowedToUpdateTicks();
-        _validateTicks(_lowerTick, _upperTick, state.tickSpacing);
-        state.lowerTick = _lowerTick;
-        state.upperTick = _upperTick;
-
-        emit TicksSet(_lowerTick, _upperTick);
-    }
+    event OraclesHeartbeatUpdated(uint256 collateralOracleHearbeat, uint256 ghoOracleHeartbreat);
 
     // @notice uniswapV3 mint callback implementation.
     // @param amount0Owed amount in token0 to transfer.
@@ -97,7 +85,7 @@ library LogicLib {
     // @return shares the amount of shares minted.
     function mint(DataTypesLib.State storage state, uint256 amount) external returns (uint256 shares) {
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
-        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThrehold();
+        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         if (totalSupply != 0) {
@@ -122,7 +110,7 @@ library LogicLib {
     // @return shares the amount of assets in collateral token received by the user.
     function burn(DataTypesLib.State storage state, uint256 shares) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
-        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThrehold();
+        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         uint256 balanceBefore = vault.balanceOf(msg.sender);
@@ -166,9 +154,14 @@ library LogicLib {
         DataTypesLib.State storage state,
         bool zeroForOne,
         int256 swapAmount,
-        uint160 sqrtPriceLimitX96
+        uint160 sqrtPriceLimitX96,
+        uint256 minAmountIn
     ) external returns (int256 amount0, int256 amount1) {
         (amount0, amount1) = state.pool.swap(address(this), zeroForOne, swapAmount, sqrtPriceLimitX96, "");
+
+        if ((zeroForOne && uint256(-amount1) < minAmountIn) || (!zeroForOne && uint256(-amount0) < minAmountIn))
+            revert VaultErrors.SlippageExceedThreshold();
+
         emit Swapped(zeroForOne, amount0, amount1);
     }
 
@@ -177,6 +170,7 @@ library LogicLib {
     // @param newUpperTick upper tick of the position.
     // @param amount0 amount in token0 to add.
     // @param amount1 amount in token1 to add.
+    // @param minAmounts min amounts to add for slippage protection.
     // @return remainingAmount0 amount in token0 left passive in the vault.
     // @return remainingAmount1 amount in token1 left passive in the vault.
     function addLiquidity(
@@ -184,7 +178,8 @@ library LogicLib {
         int24 newLowerTick,
         int24 newUpperTick,
         uint256 amount0,
-        uint256 amount1
+        uint256 amount1,
+        uint256[2] calldata minAmounts
     ) external returns (uint256 remainingAmount0, uint256 remainingAmount1) {
         if (state.inThePosition) revert VaultErrors.LiquidityAlreadyAdded();
         _validateTicks(newLowerTick, newUpperTick, state.tickSpacing);
@@ -204,6 +199,10 @@ library LogicLib {
                 baseLiquidity,
                 ""
             );
+            console.log(minAmounts[0], minAmounts[1]);
+            if (amountDeposited0 < minAmounts[0] || amountDeposited1 < minAmounts[1])
+                revert VaultErrors.SlippageExceedThreshold();
+
             emit LiquidityAdded(baseLiquidity, newLowerTick, newUpperTick, amountDeposited0, amountDeposited1);
 
             remainingAmount0 = amount0 - amountDeposited0;
@@ -218,7 +217,7 @@ library LogicLib {
     }
 
     // @notice called by manager to transfer the unclaimed fee from pool to the vault.
-    function pullFeeFromPool(DataTypesLib.State storage state) external {
+    function pullFeeFromPool(DataTypesLib.State storage state) public {
         (, , uint256 fee0, uint256 fee1) = _withdraw(state, 0);
         _applyPerformanceFee(state, fee0, fee1);
         (fee0, fee1) = _netPerformanceFees(state, fee0, fee1);
@@ -240,9 +239,25 @@ library LogicLib {
         if (newManagingFee > MAX_MANAGING_FEE_BPS) revert VaultErrors.InvalidManagingFee();
         if (newPerformanceFee > MAX_PERFORMANCE_FEE_BPS) revert VaultErrors.InvalidPerformanceFee();
 
+        // only pull existing fee if the vault already has a position opened in the pool.
+        if (state.inThePosition) pullFeeFromPool(state);
         state.managingFee = newManagingFee;
         state.performanceFee = newPerformanceFee;
         emit FeesUpdated(newManagingFee, newPerformanceFee);
+    }
+
+    // @notice updates the hearbeat duration of collateral and gho price oracles.
+    // @param collateralOracleHBDuration heartbeat duration for collateral price oracle.
+    // @param ghoOracleHBDuration heartbeat duration for gho price oracle.
+    function updatePriceOracleHeartbeatsDuration(
+        DataTypesLib.State storage state,
+        uint256 collateralOracleHBDuration,
+        uint256 ghoOracleHBDuration
+    ) external {
+        state.collateralPriceOracle.heartbeatDuration = collateralOracleHBDuration;
+        state.ghoPriceOracle.heartbeatDuration = ghoOracleHBDuration;
+
+        emit OraclesHeartbeatUpdated(collateralOracleHBDuration, ghoOracleHBDuration);
     }
 
     // @notice supplied collateral to Aave. Called by manager only.
@@ -356,6 +371,7 @@ library LogicLib {
     // vault balance.
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
+        _isPriceWithinThrehold(state);
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
@@ -371,11 +387,8 @@ library LogicLib {
             vars.amount1FromPool + state.token1.balanceOf(address(this)) + vars.amount1FromAave
         );
 
-        int256 managerBalance = int256(state.managerBalance);
-        if (vars.token1Balance > managerBalance) vars.token1Balance -= managerBalance;
-
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
+        (, int256 collateralPrice, , , ) = state.collateralPriceOracle.priceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceOracle.priceFeed.latestRoundData();
 
         int256 amountSigned = vars.token1Balance +
             ((vars.token0Balance * ghoPrice * int256(10 ** state.decimals1)) /
@@ -383,7 +396,10 @@ library LogicLib {
                 int256(10 ** state.decimals0));
 
         if (amountSigned < 0) revert VaultErrors.DebtGreaterThanAssets();
-        return uint256(amountSigned);
+        amount = uint256(amountSigned);
+
+        // if the underlying asset amount is greater than manager balance then subtract it from the underlying balance.
+        if (amount > state.managerBalance) amount -= state.managerBalance;
     }
 
     // @notice returns underlying balance in collateral token based on the shares amount passed.
@@ -438,16 +454,15 @@ library LogicLib {
     function getUnderlyingBalancesFromAave(
         DataTypesLib.State storage state
     ) public view returns (uint256 amount0, uint256 amount1) {
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(state.poolAddressesProvider.getPool())
-            .getUserAccountData(address(this));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = getAavePositionData(state);
 
         uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(state.poolAddressesProvider.getPriceOracle())
             .BASE_CURRENCY_UNIT();
 
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
+        (, int256 collateralPrice, , , ) = state.collateralPriceOracle.priceFeed.latestRoundData();
         amount0 = (totalDebtBase * 10 ** state.decimals0) / BASE_CURRENCY_UNIT;
         amount1 =
-            (totalCollateralBase * 10 ** state.decimals1 * 10 ** state.collateralTokenPriceFeed.decimals()) /
+            (totalCollateralBase * 10 ** state.decimals1 * 10 ** state.collateralPriceOracle.priceFeed.decimals()) /
             uint256(collateralPrice) /
             BASE_CURRENCY_UNIT;
     }
@@ -484,7 +499,7 @@ library LogicLib {
     function getAavePositionData(
         DataTypesLib.State storage state
     )
-        external
+        public
         view
         returns (
             uint256 totalCollateralBase,
@@ -573,6 +588,8 @@ library LogicLib {
     // @notice returns if the current of price of gho against collateral token from AMM does not deviate more than 0.5%
     // from gho price against collateral token from Chainlink price oracle.
     function _isPriceWithinThrehold(DataTypesLib.State storage state) private view returns (bool) {
+        // revert if price from any of the price oracles is stalled.
+        validatePriceOraclesStaleness(state);
         (uint160 sqrtRatioX96, , , , , , ) = state.pool.slot0();
         uint256 priceFromUniswap = FullMath.mulDiv(
             uint256(sqrtRatioX96) * uint256(sqrtRatioX96),
@@ -580,12 +597,29 @@ library LogicLib {
             1 << 192
         );
 
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
+        (, int256 collateralPrice, , , ) = state.collateralPriceOracle.priceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceOracle.priceFeed.latestRoundData();
 
         uint256 priceFromOracle = (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice);
-        uint256 priceRatio = (priceFromUniswap * 10000) / priceFromOracle;
-        return priceRatio <= 10050 && priceRatio >= 9950;
+        uint256 priceRatio = (priceFromUniswap * 10_000) / priceFromOracle;
+        // price from uni pool must deviate by 0.5% with the price from Chainlink oracle.
+        return priceRatio <= 10_050 && priceRatio >= 9_950;
+    }
+
+    // @notice checks the staleness of price oracles from Chainlink. If the last updated answer is older than the
+    // heartbeat of the price oracle then the call to this function is reverted.
+    function validatePriceOraclesStaleness(DataTypesLib.State storage state) private view {
+        AggregatorV3Interface collateralPriceFeed = state.collateralPriceOracle.priceFeed;
+        AggregatorV3Interface ghoPriceFeed = state.ghoPriceOracle.priceFeed;
+
+        (, , , uint256 collateralPriceUpdatedAt, ) = collateralPriceFeed.latestRoundData();
+        (, , , uint256 ghoPriceUpdatedAt, ) = ghoPriceFeed.latestRoundData();
+
+        if (block.timestamp - collateralPriceUpdatedAt > state.collateralPriceOracle.heartbeatDuration)
+            revert VaultErrors.OraclePriceIsOutdated(address(collateralPriceFeed));
+
+        if (block.timestamp - ghoPriceUpdatedAt > state.ghoPriceOracle.heartbeatDuration)
+            revert VaultErrors.OraclePriceIsOutdated(address(ghoPriceFeed));
     }
 
     // @notice applies managing fee to the amount.
@@ -601,9 +635,13 @@ library LogicLib {
         uint256 _performanceFee = state.performanceFee;
         state.managerBalance += (fee1 * _performanceFee) / 10_000;
 
-        (, int256 collateralPrice, , , ) = state.collateralTokenPriceFeed.latestRoundData();
-        (, int256 ghoPrice, , , ) = state.ghoPriceFeed.latestRoundData();
-        state.managerBalance += (fee0 * uint256(ghoPrice) * _performanceFee) / uint256(collateralPrice) / 10_000;
+        (, int256 collateralPrice, , , ) = state.collateralPriceOracle.priceFeed.latestRoundData();
+        (, int256 ghoPrice, , , ) = state.ghoPriceOracle.priceFeed.latestRoundData();
+        state.managerBalance +=
+            (fee0 * 10 ** state.decimals1 * uint256(ghoPrice) * _performanceFee) /
+            10 ** state.decimals0 /
+            uint256(collateralPrice) /
+            10_000;
     }
 
     // @notice deducts managing fee from the amount.

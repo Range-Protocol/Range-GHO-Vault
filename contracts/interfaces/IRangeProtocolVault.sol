@@ -38,13 +38,11 @@ interface IRangeProtocolVault is
     event CollateralWithdrawn(address token, uint256 amount);
     event GHOMinted(uint256 amount);
     event GHOBurned(uint256 amount);
-    event PoolRebalanced();
+    event PoolRepegged();
+    event OraclesHeartbeatUpdated(uint256 collateralOracleHearbeat, uint256 ghoOracleHeartbreat);
 
     // @notice intializes the vault.
     function initialize(address _pool, int24 _tickSpacing, bytes memory data) external;
-
-    // @notice updates the ticks and is only called by the manager.
-    function updateTicks(int24 _lowerTick, int24 _upperTick) external;
 
     // @notice mints vault shares to users by accepting the liquidity in collateral token.
     function mint(uint256 amount) external returns (uint256 shares);
@@ -65,7 +63,8 @@ interface IRangeProtocolVault is
     function swap(
         bool zeroForOne,
         int256 swapAmount,
-        uint160 sqrtPriceLimitX96
+        uint160 sqrtPriceLimitX96,
+        uint256 minAmountIn
     ) external returns (int256 amount0, int256 amount1);
 
     // @notice adds liquidity to newer tick range. Only callable by vault manager.
@@ -73,7 +72,8 @@ interface IRangeProtocolVault is
         int24 newLowerTick,
         int24 newUpperTick,
         uint256 amount0,
-        uint256 amount1
+        uint256 amount1,
+        uint256[2] calldata minAmounts
     ) external returns (uint256 remainingAmount0, uint256 remainingAmount1);
 
     // @notice collects manager fee by manager. Only callable by vault manager.
@@ -81,21 +81,6 @@ interface IRangeProtocolVault is
 
     // @notice updates fees percentages. Only callable by the vault manager.
     function updateFees(uint16 newManagingFee, uint16 newPerformanceFee) external;
-
-    // @notice returns the underlying balance of vault in collateral token.
-    function getBalanceInCollateralToken() external view returns (uint256 amount);
-
-    // @notice returns the underlying balance based on the amount of {shares}.
-    function getUnderlyingBalanceByShare(uint256 shares) external view returns (uint256 amount);
-
-    // @notice returns currenly unclaimed fee in the contract.
-    function getCurrentFees() external view returns (uint256 fee0, uint256 fee1);
-
-    // @notice returns current position id of the contract.
-    function getPositionID() external view returns (bytes32 positionID);
-
-    // @notice returns users vaults based on the passed indexes.
-    function getUserVaults(uint256 fromIdx, uint256 toIdx) external view returns (DataTypesLib.UserVaultInfo[] memory);
 
     // @notice supplies collateral to Aave in collateral token.
     function supplyCollateral(uint256 supplyAmount) external;
@@ -109,6 +94,12 @@ interface IRangeProtocolVault is
     // @notice payback the debt in GHO token to Aave.
     function burnGHO(uint256 burnAmount) external;
 
-    // @notice multicall function to rebalance the AMM pool.
-    function rebalance(bytes[] memory calldatas) external returns (bytes[] memory returndatas);
+    // @notice multicall function to repeg the AMM pool.
+    function repegPool(bytes[] memory calldatas) external returns (bytes[] memory returndatas);
+
+    // @notice updates the hearbeat duration of collateral and gho price oracles.
+    function updatePriceOracleHeartbeatsDuration(
+        uint256 collateralOracleHBDuration,
+        uint256 ghoOracleHBDuration
+    ) external;
 }

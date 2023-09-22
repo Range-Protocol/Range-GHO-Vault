@@ -57,15 +57,20 @@ contract RangeProtocolVault is
             string memory _symbol,
             address _gho,
             address _poolAddressesProvider,
-            address _collateralTokenPriceFeed,
-            address _ghoPriceFeed
-        ) = abi.decode(data, (address, string, string, address, address, address, address));
+            address _collateralPriceOracleAddress,
+            uint256 _collateralPriceOracleHeartbeat,
+            address _ghoPriceOracleAddress,
+            uint256 _ghoPriceOracleHeartbeat
+        ) = abi.decode(data, (address, string, string, address, address, address, uint256, address, uint256));
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Ownable_init();
         __ERC20_init(_name, _symbol);
         __Pausable_init();
         _transferOwnership(manager);
+
+        if (manager == address(0x0)) revert VaultErrors.ZeroManagerAddress();
+        if (address(IUniswapV3Pool(_pool).token0()) != _gho) revert VaultErrors.TokenZeroIsNotGHO();
 
         state.pool = IUniswapV3Pool(_pool);
         IERC20Upgradeable token0 = IERC20Upgradeable(state.pool.token0());
@@ -79,23 +84,21 @@ contract RangeProtocolVault is
         state.decimals0 = decimals0;
         state.decimals1 = decimals1;
         state.poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
-        state.collateralTokenPriceFeed = AggregatorV3Interface(_collateralTokenPriceFeed);
-        state.ghoPriceFeed = AggregatorV3Interface(_ghoPriceFeed);
+        state.collateralPriceOracle = DataTypesLib.PriceOracle(
+            AggregatorV3Interface(_collateralPriceOracleAddress),
+            _collateralPriceOracleHeartbeat
+        );
+        state.ghoPriceOracle = DataTypesLib.PriceOracle(
+            AggregatorV3Interface(_ghoPriceOracleAddress),
+            _ghoPriceOracleHeartbeat
+        );
 
         state.vaultDecimals = address(token0) == _gho
             ? state.vaultDecimals = decimals1
             : state.vaultDecimals = decimals0;
 
-        // Managing fee is 0.1% at the time vault initialization.
+        // Managing fee is 0.1% and performance fee is 2.5% at the time vault initialization.
         LogicLib.updateFees(state, 10, 250);
-    }
-
-    // @notice updates the tick range upon vault deployment or when the vault is out of position and totalSupply is zero.
-    // It can only be called by the manager. It calls updateTicks function on the LogicLib to execute logic.
-    // @param _lowerTick lower tick of the position.
-    // @param _upperTick upper tick of the position.
-    function updateTicks(int24 _lowerTick, int24 _upperTick) external override onlyManager {
-        LogicLib.updateTicks(state, _lowerTick, _upperTick);
     }
 
     // @notice pauses the mint and burn functions. It can only be called by the vault manager.
@@ -168,9 +171,10 @@ contract RangeProtocolVault is
     function swap(
         bool zeroForOne,
         int256 swapAmount,
-        uint160 sqrtPriceLimitX96
+        uint160 sqrtPriceLimitX96,
+        uint256 minAmountIn
     ) external override onlyManager returns (int256 amount0, int256 amount1) {
-        return LogicLib.swap(state, zeroForOne, swapAmount, sqrtPriceLimitX96);
+        return LogicLib.swap(state, zeroForOne, swapAmount, sqrtPriceLimitX96, minAmountIn);
     }
 
     // @notice called by manager to provide liquidity to pool into a newer tick range. Calls addLiquidity function on
@@ -185,9 +189,10 @@ contract RangeProtocolVault is
         int24 newLowerTick,
         int24 newUpperTick,
         uint256 amount0,
-        uint256 amount1
+        uint256 amount1,
+        uint256[2] calldata minAmounts
     ) external override onlyManager returns (uint256 remainingAmount0, uint256 remainingAmount1) {
-        return LogicLib.addLiquidity(state, newLowerTick, newUpperTick, amount0, amount1);
+        return LogicLib.addLiquidity(state, newLowerTick, newUpperTick, amount0, amount1, minAmounts);
     }
 
     // @notice called by manager to transfer the unclaimed fee from pool to the vault. Calls pullFeeFromPool function on
@@ -254,7 +259,9 @@ contract RangeProtocolVault is
         LogicLib.burnGHO(state, burnAmount);
     }
 
-    function rebalance(bytes[] memory calldatas) external override onlyManager returns (bytes[] memory returndatas) {
+    // @notice a multicall function to repeg the pool through the number of actions supplying/withdrawing collateral,
+    // minting/burning of gho and performing swap on the uni pool.
+    function repegPool(bytes[] memory calldatas) external override onlyManager returns (bytes[] memory returndatas) {
         returndatas = new bytes[](calldatas.length);
         for (uint256 i = 0; i < calldatas.length; i++) {
             (bool success, bytes memory returndata) = address(this).delegatecall(calldatas[i]);
@@ -269,7 +276,17 @@ contract RangeProtocolVault is
             returndatas[i] = returndata;
         }
 
-        emit PoolRebalanced();
+        emit PoolRepegged();
+    }
+
+    // @notice updates the hearbeat duration of collateral and gho price oracles.
+    // @param collateralOracleHBDuration heartbeat duration for collateral price oracle.
+    // @param ghoOracleHBDuration heartbeat duration for gho price oracle.
+    function updatePriceOracleHeartbeatsDuration(
+        uint256 collateralOracleHBDuration,
+        uint256 ghoOracleHBDuration
+    ) external override onlyManager {
+        LogicLib.updatePriceOracleHeartbeatsDuration(state, collateralOracleHBDuration, ghoOracleHBDuration);
     }
 
     /**
@@ -319,6 +336,15 @@ contract RangeProtocolVault is
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken() public view override returns (uint256 amount) {
         return LogicLib.getBalanceInCollateralToken(state);
+    }
+
+    function getUnderlyingBalancesFromPool() external view override returns (uint256, uint256) {
+        (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
+        return LogicLib.getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
+    }
+
+    function getUnderlyingBalancesFromAave() external view override returns (uint256, uint256) {
+        return LogicLib.getUnderlyingBalancesFromAave(state);
     }
 
     // @notice restricts upgrading of vault to factory only.

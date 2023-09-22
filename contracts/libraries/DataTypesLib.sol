@@ -17,6 +17,11 @@ library DataTypesLib {
         uint256 token;
     }
 
+    struct PriceOracle {
+        AggregatorV3Interface priceFeed;
+        uint256 heartbeatDuration;
+    }
+
     struct State {
         address factory;
         IUniswapV3Pool pool;
@@ -33,8 +38,8 @@ library DataTypesLib {
         uint16 performanceFee;
         uint256 managerBalance;
         IPoolAddressesProvider poolAddressesProvider;
-        AggregatorV3Interface collateralTokenPriceFeed;
-        AggregatorV3Interface ghoPriceFeed;
+        PriceOracle collateralPriceOracle;
+        PriceOracle ghoPriceOracle;
         mapping(address => UserVault) vaults;
         address[] users;
     }

@@ -36,10 +36,22 @@ export const getInitializeData = (params: {
   gho: string;
   poolAddressesProvider: string;
   collateralTokenPriceFeed: string;
+  collateralPriceOracleHeartbeat: number;
   ghoPriceFeed: string;
+  ghoPriceOracleHeartbeat: number;
 }): any =>
   ethers.utils.defaultAbiCoder.encode(
-    ["address", "string", "string", "address", "address", "address", "address"],
+    [
+      "address",
+      "string",
+      "string",
+      "address",
+      "address",
+      "address",
+      "uint256",
+      "address",
+      "uint256",
+    ],
     [
       params.managerAddress,
       params.name,
@@ -47,7 +59,9 @@ export const getInitializeData = (params: {
       params.gho,
       params.poolAddressesProvider,
       params.collateralTokenPriceFeed,
+      params.collateralPriceOracleHeartbeat,
       params.ghoPriceFeed,
+      params.ghoPriceOracleHeartbeat,
     ]
   );
 
