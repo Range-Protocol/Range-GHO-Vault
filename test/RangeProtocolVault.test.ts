@@ -443,7 +443,7 @@ describe("RangeProtocolVault", () => {
   describe("Remove Liquidity", () => {
     it("should not remove liquidity by non-manager", async () => {
       await expect(
-        vault.connect(nonManager).removeLiquidity()
+        vault.connect(nonManager).removeLiquidity([0, 0])
       ).to.be.revertedWith("Ownable: caller is not the manager");
     });
 
@@ -456,7 +456,7 @@ describe("RangeProtocolVault", () => {
       expect(liquidityBefore).not.to.be.equal(0);
 
       const { fee0, fee1 } = await vault.getCurrentFees();
-      await expect(vault.removeLiquidity())
+      await expect(vault.removeLiquidity([0, 0]))
         .to.emit(vault, "InThePositionStatusSet")
         .withArgs(false)
         .to.emit(vault, "FeesEarned")
@@ -647,6 +647,13 @@ describe("RangeProtocolVault", () => {
           .connect(nonManager)
           .upgradeVaults([vault.address], [newVaultImpl.address])
       ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("an EOA address provided as implementation should not upgrade the contract", async () => {
+      const newVaultImpl = manager.address;
+      await expect(
+        factory.upgradeVault(vault.address, newVaultImpl)
+      ).to.be.revertedWithCustomError(factory, "ImplIsNotAContract");
     });
 
     it("should upgrade range vault implementation by factory manager", async () => {

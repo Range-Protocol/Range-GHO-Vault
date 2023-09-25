@@ -255,7 +255,7 @@ describe.skip("RangeProtocolVault::exposure", () => {
     console.log("==================================================");
 
     console.log("Remove liquidity from uniswap pool");
-    await vault.removeLiquidity();
+    await vault.removeLiquidity([0, 0]);
     console.log("==================================================");
 
     console.log("Total users vault amounts based on their initial deposits");

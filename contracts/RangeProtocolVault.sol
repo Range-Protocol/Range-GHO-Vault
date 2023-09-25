@@ -158,8 +158,8 @@ contract RangeProtocolVault is
     }
 
     // @notice called by manager to remove liquidity from the pool. Calls removeLiquidity function on the LogcLib.
-    function removeLiquidity() external override onlyManager {
-        LogicLib.removeLiquidity(state);
+    function removeLiquidity(uint256[2] calldata minAmounts) external override onlyManager {
+        LogicLib.removeLiquidity(state, minAmounts);
     }
 
     // @notice called by manager to perform swap from token0 to token1 and vice-versa. Calls swap function on the LogicLib.
@@ -271,7 +271,7 @@ contract RangeProtocolVault is
                         revert(add(32, returndata), mload(returndata))
                     }
                 }
-                revert VaultErrors.MulticallFailed();
+                revert VaultErrors.PoolRepegFailed();
             }
             returndatas[i] = returndata;
         }

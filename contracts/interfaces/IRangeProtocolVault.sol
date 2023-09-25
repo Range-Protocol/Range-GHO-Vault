@@ -57,7 +57,7 @@ interface IRangeProtocolVault is
     function burnShares(address from, uint256 shares) external;
 
     // @notice removes liquidity from the vault. Only callable by vault manager.
-    function removeLiquidity() external;
+    function removeLiquidity(uint256[2] calldata minAmounts) external;
 
     // @notice swaps token0 to token1 and vice-versa within the vault. Only callable by vault manager.
     function swap(

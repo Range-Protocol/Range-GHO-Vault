@@ -85,11 +85,12 @@ library LogicLib {
     // @return shares the amount of shares minted.
     function mint(DataTypesLib.State storage state, uint256 amount) external returns (uint256 shares) {
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
-        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThreshold();
+        if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         if (totalSupply != 0) {
             uint256 totalAmount = getBalanceInCollateralToken(state);
+            // rounding up the shares to prevent the inflation attack.
             shares = FullMath.mulDivRoundingUp(amount, totalSupply, totalAmount);
         } else {
             shares = amount;
@@ -110,7 +111,7 @@ library LogicLib {
     // @return shares the amount of assets in collateral token received by the user.
     function burn(DataTypesLib.State storage state, uint256 shares) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
-        if (!_isPriceWithinThrehold(state)) revert VaultErrors.PriceNotWithinThreshold();
+        if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         uint256 balanceBefore = vault.balanceOf(msg.sender);
@@ -128,10 +129,12 @@ library LogicLib {
     }
 
     // @notice called by manager to remove liquidity from the pool.
-    function removeLiquidity(DataTypesLib.State storage state) external {
+    function removeLiquidity(DataTypesLib.State storage state, uint256[2] calldata minAmounts) external {
         (uint128 liquidity, , , , ) = state.pool.positions(getPositionID(state));
         if (liquidity != 0) {
             (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) = _withdraw(state, liquidity);
+            if (amount0 < minAmounts[0] || amount1 < minAmounts[1]) revert VaultErrors.SlippageExceedThreshold();
+
             emit LiquidityRemoved(liquidity, state.lowerTick, state.upperTick, amount0, amount1);
 
             _applyPerformanceFee(state, fee0, fee1);
@@ -199,7 +202,6 @@ library LogicLib {
                 baseLiquidity,
                 ""
             );
-            console.log(minAmounts[0], minAmounts[1]);
             if (amountDeposited0 < minAmounts[0] || amountDeposited1 < minAmounts[1])
                 revert VaultErrors.SlippageExceedThreshold();
 
@@ -371,7 +373,7 @@ library LogicLib {
     // vault balance.
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
-        _isPriceWithinThrehold(state);
+        _isPriceWithinThreshold(state);
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
@@ -587,7 +589,7 @@ library LogicLib {
 
     // @notice returns if the current of price of gho against collateral token from AMM does not deviate more than 0.5%
     // from gho price against collateral token from Chainlink price oracle.
-    function _isPriceWithinThrehold(DataTypesLib.State storage state) private view returns (bool) {
+    function _isPriceWithinThreshold(DataTypesLib.State storage state) private view returns (bool) {
         // revert if price from any of the price oracles is stalled.
         validatePriceOraclesStaleness(state);
         (uint160 sqrtRatioX96, , , , , , ) = state.pool.slot0();

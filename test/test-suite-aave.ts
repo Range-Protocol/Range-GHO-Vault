@@ -157,7 +157,7 @@ describe("Test suite for Aave", () => {
       (await gho.balanceOf(vault.address)).toString()
     );
 
-    await vault.removeLiquidity();
+    await vault.removeLiquidity([0, 0]);
     console.log("Vault balance after removing liquidity from uniswap");
     console.log(
       "Vault USDC balance: ",

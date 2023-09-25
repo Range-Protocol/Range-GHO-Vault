@@ -14,7 +14,7 @@ library VaultErrors {
     error LiquidityAlreadyAdded();
     error OnlyVaultAllowed();
     error PriceNotWithinThreshold();
-    error MulticallFailed();
+    error PoolRepegFailed();
     error DebtGreaterThanAssets();
     error OraclePriceIsOutdated(address oracle);
     error ZeroManagerAddress();
