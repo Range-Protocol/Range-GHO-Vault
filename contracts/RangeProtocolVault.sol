@@ -144,9 +144,13 @@ contract RangeProtocolVault is
     // @notice called by the user with collateral amount to provide liquidity in collateral amount. Calls mint function
     // on the LogicLib to execute logic.
     // @param amount the amount of collateral to provide.
+    // @param minShares the minimum shares to mint.
     // @return shares the amount of shares minted.
-    function mint(uint256 amount) external override nonReentrant whenNotPaused returns (uint256 shares) {
-        return LogicLib.mint(state, amount);
+    function mint(
+        uint256 amount,
+        uint256 minShares
+    ) external override nonReentrant whenNotPaused returns (uint256 shares) {
+        return LogicLib.mint(state, amount, minShares);
     }
 
     // @notice called by the user with share amount to burn their vault shares redeem their share of the asset. Calls

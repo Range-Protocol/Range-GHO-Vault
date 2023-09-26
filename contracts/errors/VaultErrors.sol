@@ -20,4 +20,5 @@ library VaultErrors {
     error ZeroManagerAddress();
     error TokenZeroIsNotGHO();
     error SlippageExceedThreshold();
+    error InsufficientBalanceForShares();
 }

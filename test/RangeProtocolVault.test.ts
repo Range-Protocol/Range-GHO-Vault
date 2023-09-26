@@ -137,10 +137,9 @@ describe("RangeProtocolVault", () => {
 
   it("should not allow minting with zero mint amount", async () => {
     const mintAmount = 0;
-    await expect(vault.mint(mintAmount)).to.be.revertedWithCustomError(
-      logicLib,
-      "InvalidCollateralAmount"
-    );
+    await expect(
+      vault.mint(mintAmount, mintAmount)
+    ).to.be.revertedWithCustomError(logicLib, "InvalidCollateralAmount");
   });
 
   it("should not mint when contract is paused", async () => {
@@ -150,16 +149,22 @@ describe("RangeProtocolVault", () => {
       .withArgs(manager.address);
     expect(await vault.paused()).to.be.equal(true);
 
-    await expect(vault.mint(123)).to.be.revertedWith("Pausable: paused");
+    await expect(vault.mint(123, 123)).to.be.revertedWith("Pausable: paused");
     await expect(vault.unpause())
       .to.emit(vault, "Unpaused")
       .withArgs(manager.address);
   });
 
+  it("should not allow minting with shares being minted are less than minShares", async () => {
+    await expect(
+      vault.mint(collateralAmount, collateralAmount.mul(2))
+    ).to.be.revertedWithCustomError(logicLib, "InsufficientBalanceForShares");
+  });
+
   it("should mint with zero totalSupply of vault shares", async () => {
     expect(await vault.totalSupply()).to.be.equal(0);
 
-    await expect(vault.mint(collateralAmount))
+    await expect(vault.mint(collateralAmount, collateralAmount))
       .to.emit(vault, "Minted")
       .withArgs(manager.address, collateralAmount, collateralAmount);
 
@@ -181,7 +186,7 @@ describe("RangeProtocolVault", () => {
       .mul(totalSupply)
       .div(await vault.getBalanceInCollateralToken());
 
-    await expect(vault.mint(collateralAmount))
+    await expect(vault.mint(collateralAmount, shares))
       .to.emit(vault, "Minted")
       .withArgs(manager.address, shares, collateralAmount);
 
@@ -254,7 +259,10 @@ describe("RangeProtocolVault", () => {
     const collateralInVault = (await token1.balanceOf(vault.address)).add(
       collateralAmount
     );
-    await vault.mint(collateralAmount);
+    const shares = collateralAmount
+      .mul(await vault.totalSupply())
+      .div(await vault.getBalanceInCollateralToken());
+    await vault.mint(collateralAmount, shares);
     expect(await vault.getBalanceInCollateralToken()).to.be.equal(
       collateralAmount
     );
@@ -343,7 +351,10 @@ describe("RangeProtocolVault", () => {
 
     it("supply collateral", async () => {
       await token1.approve(vault.address, collateralAmount.mul(bn(10)));
-      await vault.mint(collateralAmount);
+      const shares = collateralAmount
+        .mul(await vault.totalSupply())
+        .div(await vault.getBalanceInCollateralToken());
+      await vault.mint(collateralAmount, shares);
 
       let { totalCollateralBase } = await vault.getAavePositionData();
       expect(totalCollateralBase).to.be.equal(0);
@@ -548,7 +559,10 @@ describe("RangeProtocolVault", () => {
   describe("Fee collection", () => {
     before(async () => {
       await token1.approve(vault.address, collateralAmount);
-      await vault.mint(collateralAmount);
+      const shares = collateralAmount
+        .mul(await vault.totalSupply())
+        .div(await vault.getBalanceInCollateralToken());
+      await vault.mint(collateralAmount, shares);
       await vault.supplyCollateral(collateralAmount.div(2));
       await vault.mintGHO(collateralAmount.div(4));
       const ghoInVault = await token0.balanceOf(vault.address);

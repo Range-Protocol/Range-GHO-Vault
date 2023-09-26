@@ -45,7 +45,7 @@ interface IRangeProtocolVault is
     function initialize(address _pool, int24 _tickSpacing, bytes memory data) external;
 
     // @notice mints vault shares to users by accepting the liquidity in collateral token.
-    function mint(uint256 amount) external returns (uint256 shares);
+    function mint(uint256 amount, uint256 minShares) external returns (uint256 shares);
 
     // @notice burns vault shares from user and returns then their share in collateral token.
     function burn(uint256 burnAmount) external returns (uint256 amount);

@@ -49,7 +49,7 @@ describe("Test suite for Aave", () => {
   it("Test suite", async () => {
     const usdcDepositAmount = ethers.utils.parseUnits("100000", 6);
     await collateral.approve(vault.address, usdcDepositAmount);
-    await vault.mint(usdcDepositAmount);
+    await vault.mint(usdcDepositAmount, usdcDepositAmount);
 
     console.log(
       "User vault balance: ",

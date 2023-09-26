@@ -82,8 +82,13 @@ library LogicLib {
     // @notice called by the user with collateral amount to provide liquidity in collateral amount. The mint must fail
     // if the gho price is not within threshold of 0.5%.
     // @param amount the amount of collateral to provide.
+    // @param minShares the minimum shares to mint.
     // @return shares the amount of shares minted.
-    function mint(DataTypesLib.State storage state, uint256 amount) external returns (uint256 shares) {
+    function mint(
+        DataTypesLib.State storage state,
+        uint256 amount,
+        uint256 minShares
+    ) external returns (uint256 shares) {
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
         if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
@@ -95,6 +100,8 @@ library LogicLib {
         } else {
             shares = amount;
         }
+
+        if (shares < minShares) revert VaultErrors.InsufficientBalanceForShares();
         vault.mintShares(msg.sender, shares);
         if (!state.vaults[msg.sender].exists) {
             state.vaults[msg.sender].exists = true;
