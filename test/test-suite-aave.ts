@@ -202,7 +202,7 @@ describe("Test suite for Aave", () => {
       (await vault.totalSupply()).toString()
     );
     console.log((await vault.balanceOf(manager.address)).toString());
-    await vault.burn(await vault.balanceOf(manager.address));
+    await vault.burn(await vault.balanceOf(manager.address), 0);
 
     console.log((await vault.managerBalance()).toString());
 

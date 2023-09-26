@@ -225,9 +225,19 @@ describe("RangeProtocolVault", () => {
 
   it("should not burn non existing vault shares", async () => {
     const burnAmount = 1;
-    await expect(vault.connect(user2).burn(burnAmount)).to.be.revertedWith(
+    await expect(vault.connect(user2).burn(burnAmount, 0)).to.be.revertedWith(
       "ERC20: burn amount exceeds balance"
     );
+  });
+
+  it("should not burn vault shares when withdraw amount is less than min amount", async () => {
+    const shares = await vault.balanceOf(manager.address);
+    const minAmount = shares
+      .mul(await vault.getBalanceInCollateralToken())
+      .div(await vault.totalSupply());
+    await expect(
+      vault.connect(user2).burn(shares, minAmount.add(1000))
+    ).to.be.revertedWith("ERC20: burn amount exceeds balance");
   });
 
   it("should burn vault shares", async () => {
@@ -242,7 +252,7 @@ describe("RangeProtocolVault", () => {
     const userBalance = amount.mul(vaultShares).div(totalSupply);
     const managingFeeAmount1 = userBalance.mul(managingFee).div(10_000);
 
-    await vault.burn(burnAmount);
+    await vault.burn(burnAmount, 0);
     expect(await vault.totalSupply()).to.be.equal(totalSupply.sub(burnAmount));
 
     expect(await token1.balanceOf(manager.address)).to.be.equal(
@@ -272,7 +282,7 @@ describe("RangeProtocolVault", () => {
     );
 
     const burnAmount = await vault.balanceOf(manager.address);
-    await vault.burn(burnAmount);
+    await vault.burn(burnAmount, 0);
     expect(await vault.getBalanceInCollateralToken()).to.be.equal(
       await vault.managerBalance()
     );
@@ -546,7 +556,7 @@ describe("RangeProtocolVault", () => {
       //   userBalance.toString(),
       //   (await token1.balanceOf(vault.address)).toString()
       // );
-      await expect(vault.burn(vaultShares)).not.to.emit(vault, "FeesEarned");
+      await expect(vault.burn(vaultShares, 0)).not.to.emit(vault, "FeesEarned");
       expect(await token1.balanceOf(manager.address)).to.be.equal(
         userBalance1Before.add(userBalance).sub(managingFeeAmount)
       );

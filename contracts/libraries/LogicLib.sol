@@ -116,7 +116,7 @@ library LogicLib {
     // must fail if the gho price is not within threshold of 0.5%.
     // @param burnAmount the amount of vault shares to burn.
     // @return shares the amount of assets in collateral token received by the user.
-    function burn(DataTypesLib.State storage state, uint256 shares) external returns (uint256 amount) {
+    function burn(DataTypesLib.State storage state, uint256 shares, uint256 minAmount) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
         if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
@@ -126,6 +126,9 @@ library LogicLib {
 
         uint256 underlyingAmountInCollateralToken = getBalanceInCollateralToken(state);
         amount = FullMath.mulDiv(underlyingAmountInCollateralToken, shares, totalSupply);
+
+        if (amount < minAmount)
+            revert VaultErrors.SlippageExceedThreshold();
 
         _applyManagingFee(state, amount);
         amount = _netManagingFees(state, amount);

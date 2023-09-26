@@ -157,8 +157,8 @@ contract RangeProtocolVault is
     // burn function on the LogicLib to execute logic.
     // @param burnAmount the amount of vault shares to burn.
     // @return amount the amount of assets in collateral token received by the user.
-    function burn(uint256 burnAmount) external override nonReentrant whenNotPaused returns (uint256 amount) {
-        return LogicLib.burn(state, burnAmount);
+    function burn(uint256 burnAmount, uint256 minAmount) external override nonReentrant whenNotPaused returns (uint256 amount) {
+        return LogicLib.burn(state, burnAmount, minAmount);
     }
 
     // @notice called by manager to remove liquidity from the pool. Calls removeLiquidity function on the LogcLib.

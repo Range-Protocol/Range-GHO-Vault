@@ -48,7 +48,7 @@ interface IRangeProtocolVault is
     function mint(uint256 amount, uint256 minShares) external returns (uint256 shares);
 
     // @notice burns vault shares from user and returns then their share in collateral token.
-    function burn(uint256 burnAmount) external returns (uint256 amount);
+    function burn(uint256 burnAmount, uint256 minAmount) external returns (uint256 amount);
 
     // @notice mints shares to users. Only callable by the vault contract through library.
     function mintShares(address to, uint256 shares) external;

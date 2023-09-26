@@ -347,7 +347,7 @@ describe.skip("RangeProtocolVault::exposure", () => {
 
     console.log("user 1 withdraws liquidity");
     const user1Amount = await vault.balanceOf(manager.address);
-    await vault.burn(user1Amount);
+    await vault.burn(user1Amount, 0);
 
     console.log("==================================================");
     console.log("Vault balance after user1 withdraws liquidity");
@@ -359,7 +359,7 @@ describe.skip("RangeProtocolVault::exposure", () => {
 
     console.log("user 2 withdraws liquidity");
     const user2Amount = await vault.balanceOf(newManager.address);
-    await vault.connect(newManager).burn(user2Amount);
+    await vault.connect(newManager).burn(user2Amount, 0);
 
     console.log("==================================================");
     console.log("Vault balance after user2 withdraws liquidity");
