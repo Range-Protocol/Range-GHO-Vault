@@ -183,7 +183,7 @@ library LogicLib {
     // @param newUpperTick upper tick of the position.
     // @param amount0 amount in token0 to add.
     // @param amount1 amount in token1 to add.
-    // @param minAmounts min amounts to add for slippage protection.
+    // @param maxAmounts min amounts to add for slippage protection.
     // @return remainingAmount0 amount in token0 left passive in the vault.
     // @return remainingAmount1 amount in token1 left passive in the vault.
     function addLiquidity(
@@ -192,7 +192,7 @@ library LogicLib {
         int24 newUpperTick,
         uint256 amount0,
         uint256 amount1,
-        uint256[2] calldata minAmounts
+        uint256[2] calldata maxAmounts
     ) external returns (uint256 remainingAmount0, uint256 remainingAmount1) {
         if (state.inThePosition) revert VaultErrors.LiquidityAlreadyAdded();
         _validateTicks(newLowerTick, newUpperTick, state.tickSpacing);
@@ -212,7 +212,7 @@ library LogicLib {
                 baseLiquidity,
                 ""
             );
-            if (amountDeposited0 < minAmounts[0] || amountDeposited1 < minAmounts[1])
+            if (amountDeposited0 > maxAmounts[0] || amountDeposited1 > maxAmounts[1])
                 revert VaultErrors.SlippageExceedThreshold();
 
             emit LiquidityAdded(baseLiquidity, newLowerTick, newUpperTick, amountDeposited0, amountDeposited1);

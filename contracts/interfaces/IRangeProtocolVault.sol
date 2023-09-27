@@ -73,7 +73,7 @@ interface IRangeProtocolVault is
         int24 newUpperTick,
         uint256 amount0,
         uint256 amount1,
-        uint256[2] calldata minAmounts
+        uint256[2] calldata maxAmounts
     ) external returns (uint256 remainingAmount0, uint256 remainingAmount1);
 
     // @notice collects manager fee by manager. Only callable by vault manager.

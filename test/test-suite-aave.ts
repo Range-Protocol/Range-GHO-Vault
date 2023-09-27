@@ -124,8 +124,8 @@ describe("Test suite for Aave", () => {
       );
 
     await vault.addLiquidity(lowerTick, upperTick, ghoToAdd, usdcToAdd, [
-      ghoToAdd.mul(9900).div(10000),
-      usdcToAdd.mul(9900).div(10000),
+      ghoToAdd.mul(10100).div(10000),
+      usdcToAdd.mul(10100).div(10000),
     ]);
     await vault.getBalanceInCollateralToken();
 

@@ -453,7 +453,7 @@ describe("RangeProtocolVault", () => {
           upperTick,
           amount0ToAdd,
           amount1ToAdd,
-          [amount0ToAdd.mul(9900).div(10000), amount1ToAdd.mul(9900).div(10000)]
+          [amount0ToAdd.mul(10100).div(10000), amount1ToAdd.mul(10100).div(10000)]
         )
       )
         .to.emit(vault, "LiquidityAdded")
@@ -616,7 +616,7 @@ describe("RangeProtocolVault", () => {
         upperTick,
         amount0ToAdd,
         amount1ToAdd,
-        [amount0ToAdd.mul(9900).div(10000), amount1ToAdd.mul(9900).div(10000)]
+        [amount0ToAdd.mul(10100).div(10000), amount1ToAdd.mul(10100).div(10000)]
       );
 
       const liquidity = await univ3Pool.liquidity();

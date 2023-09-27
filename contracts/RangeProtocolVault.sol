@@ -194,9 +194,9 @@ contract RangeProtocolVault is
         int24 newUpperTick,
         uint256 amount0,
         uint256 amount1,
-        uint256[2] calldata minAmounts
+        uint256[2] calldata maxAmounts
     ) external override onlyManager returns (uint256 remainingAmount0, uint256 remainingAmount1) {
-        return LogicLib.addLiquidity(state, newLowerTick, newUpperTick, amount0, amount1, minAmounts);
+        return LogicLib.addLiquidity(state, newLowerTick, newUpperTick, amount0, amount1, maxAmounts);
     }
 
     // @notice called by manager to transfer the unclaimed fee from pool to the vault. Calls pullFeeFromPool function on
