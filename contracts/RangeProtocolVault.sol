@@ -97,8 +97,8 @@ contract RangeProtocolVault is
             ? state.vaultDecimals = decimals1
             : state.vaultDecimals = decimals0;
 
-        // Managing fee is 0.1% and performance fee is 2.5% at the time vault initialization.
-        LogicLib.updateFees(state, 10, 250);
+        // Managing fee is 0.1% and performance fee is 10% at the time vault initialization.
+        LogicLib.updateFees(state, 10, 1000);
     }
 
     // @notice pauses the mint and burn functions. It can only be called by the vault manager.

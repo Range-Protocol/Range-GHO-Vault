@@ -23,7 +23,10 @@ library LogicLib {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using TickMath for int24;
 
-    uint16 public constant MAX_PERFORMANCE_FEE_BPS = 1000;
+    /// Performance fee cannot be set more than 20% of the fee earned from uniswap v3 pool.
+    uint16 public constant MAX_PERFORMANCE_FEE_BPS = 2000;
+
+    /// Managing fee cannot be set more than 1% of the total fee earned.
     uint16 public constant MAX_MANAGING_FEE_BPS = 100;
 
     event Minted(address indexed receiver, uint256 shares, uint256 amount);

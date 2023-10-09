@@ -5,7 +5,7 @@ import { getInitializeData } from "../test/common";
 async function main() {
   const provider = ethers.getDefaultProvider(""); // To be updated.
   const ledger = await new LedgerSigner(provider, ""); // To be updated.
-  const managerAddress = "0x84b43ce5fB1FAF013181FEA96ffA4af6179e396a"; // To be updated.
+  const managerAddress = ""; // To be updated.
   const rangeProtocolFactoryAddress = ""; // To be updated.
   const vaultImplAddress = ""; // to be updated.
   const token0 = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"; // to be updated.
@@ -23,10 +23,12 @@ async function main() {
     managerAddress,
     name,
     symbol,
-    gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+    gho: token0,
     poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     collateralTokenPriceFeed: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+    collateralPriceOracleHeartbeat: 86400,
     ghoPriceFeed: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+    ghoPriceOracleHeartbeat: 86400,
   });
 
   const tx = await factory.createVault(token1, fee, vaultImplAddress, data);
