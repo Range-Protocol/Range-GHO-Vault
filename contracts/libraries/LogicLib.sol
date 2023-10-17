@@ -93,7 +93,7 @@ library LogicLib {
         uint256 minShares
     ) external returns (uint256 shares) {
         if (amount == 0) revert VaultErrors.InvalidCollateralAmount();
-        if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
+        _validatePriceThreshold(state);
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         if (totalSupply != 0) {
@@ -119,9 +119,13 @@ library LogicLib {
     // must fail if the gho price is not within threshold of 0.5%.
     // @param burnAmount the amount of vault shares to burn.
     // @return shares the amount of assets in collateral token received by the user.
-    function burn(DataTypesLib.State storage state, uint256 shares, uint256 minAmount) external returns (uint256 amount) {
+    function burn(
+        DataTypesLib.State storage state,
+        uint256 shares,
+        uint256 minAmount
+    ) external returns (uint256 amount) {
         if (shares == 0) revert VaultErrors.InvalidBurnAmount();
-        if (!_isPriceWithinThreshold(state)) revert VaultErrors.PriceNotWithinThreshold();
+        _validatePriceThreshold(state);
         IRangeProtocolVault vault = IRangeProtocolVault(address(this));
         uint256 totalSupply = vault.totalSupply();
         uint256 balanceBefore = vault.balanceOf(msg.sender);
@@ -130,8 +134,7 @@ library LogicLib {
         uint256 underlyingAmountInCollateralToken = getBalanceInCollateralToken(state);
         amount = FullMath.mulDiv(underlyingAmountInCollateralToken, shares, totalSupply);
 
-        if (amount < minAmount)
-            revert VaultErrors.SlippageExceedThreshold();
+        if (amount < minAmount) revert VaultErrors.SlippageExceedThreshold();
 
         _applyManagingFee(state, amount);
         amount = _netManagingFees(state, amount);
@@ -386,7 +389,7 @@ library LogicLib {
     // vault balance.
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
-        _isPriceWithinThreshold(state);
+        _validatePriceThreshold(state);
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
@@ -602,9 +605,9 @@ library LogicLib {
 
     // @notice returns if the current of price of gho against collateral token from AMM does not deviate more than 0.5%
     // from gho price against collateral token from Chainlink price oracle.
-    function _isPriceWithinThreshold(DataTypesLib.State storage state) private view returns (bool) {
+    function _validatePriceThreshold(DataTypesLib.State storage state) private view {
         // revert if price from any of the price oracles is stalled.
-        validatePriceOraclesStaleness(state);
+        _validatePriceOraclesStaleness(state);
         (uint160 sqrtRatioX96, , , , , , ) = state.pool.slot0();
         uint256 priceFromUniswap = FullMath.mulDiv(
             uint256(sqrtRatioX96) * uint256(sqrtRatioX96),
@@ -615,15 +618,20 @@ library LogicLib {
         (, int256 collateralPrice, , , ) = state.collateralPriceOracle.priceFeed.latestRoundData();
         (, int256 ghoPrice, , , ) = state.ghoPriceOracle.priceFeed.latestRoundData();
 
-        uint256 priceFromOracle = (10 ** state.decimals1 * uint256(ghoPrice)) / uint256(collateralPrice);
+        uint256 priceFromOracle = (10 ** state.decimals1 *
+            uint256(ghoPrice) *
+            state.collateralPriceOracle.priceFeed.decimals()) /
+            state.ghoPriceOracle.priceFeed.decimals() /
+            uint256(collateralPrice);
+
         uint256 priceRatio = (priceFromUniswap * 10_000) / priceFromOracle;
         // price from uni pool must deviate by 0.5% with the price from Chainlink oracle.
-        return priceRatio <= 10_050 && priceRatio >= 9_950;
+        if (priceRatio < 9_950 || priceRatio > 10_050) revert VaultErrors.PriceNotWithinThreshold();
     }
 
     // @notice checks the staleness of price oracles from Chainlink. If the last updated answer is older than the
     // heartbeat of the price oracle then the call to this function is reverted.
-    function validatePriceOraclesStaleness(DataTypesLib.State storage state) private view {
+    function _validatePriceOraclesStaleness(DataTypesLib.State storage state) private view {
         AggregatorV3Interface collateralPriceFeed = state.collateralPriceOracle.priceFeed;
         AggregatorV3Interface ghoPriceFeed = state.ghoPriceOracle.priceFeed;
 
