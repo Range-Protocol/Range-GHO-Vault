@@ -21,7 +21,7 @@ const PK_TEST = process.env.PK_TEST;
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: "DNRBUQ9BW2YU2777ZAF4767QS2B6AHQIGS",
   },
   networks: {
     hardhat: {
@@ -32,7 +32,7 @@ const config: HardhatUserConfig = {
     mainnet: {
       accounts: PK ? [PK] : [],
       chainId: 1,
-      url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
+      url: `https://eth.llamarpc.com`,
     },
     polygon: {
       accounts: PK ? [PK] : [],

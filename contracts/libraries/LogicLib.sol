@@ -389,7 +389,6 @@ library LogicLib {
     // vault balance.
     // @return amount the amount of vault holding converted to collateral token.
     function getBalanceInCollateralToken(DataTypesLib.State storage state) public view returns (uint256 amount) {
-        _validatePriceThreshold(state);
         (uint160 sqrtRatioX96, int24 tick, , , , , ) = state.pool.slot0();
         LocalVars memory vars;
         (vars.amount0FromPool, vars.amount1FromPool) = getUnderlyingBalancesFromPool(state, sqrtRatioX96, tick);
