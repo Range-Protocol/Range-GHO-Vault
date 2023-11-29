@@ -56,17 +56,6 @@ contract OwnableUpgradeable is Initializable, ContextUpgradeable {
     }
 
     /**
-     * @dev Leaves the contract without manager. It will not be possible to call
-     * `onlyManager` functions anymore. Can only be called by the current manager.
-     *
-     * NOTE: Renouncing ownership will leave the contract without a manager,
-     * thereby removing any functionality that is only available to the manager.
-     */
-    function renounceOwnership() public virtual onlyManager {
-        _transferOwnership(address(0));
-    }
-
-    /**
      * @dev Transfers ownership of the contract to a new account (`newManager`).
      * Can only be called by the current manager.
      */

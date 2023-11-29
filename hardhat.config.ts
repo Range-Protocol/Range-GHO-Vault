@@ -26,7 +26,8 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://eth.llamarpc.com",
+        enabled: true,
+        url: "https://eth-mainnet.g.alchemy.com/v2/CjYmaEKxlp-_BuTgFt22DeY3YlTQWY8O",
       },
     },
     mainnet: {
