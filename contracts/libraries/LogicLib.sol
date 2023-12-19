@@ -283,7 +283,8 @@ library LogicLib {
     function supplyCollateral(DataTypesLib.State storage state, uint256 supplyAmount) external {
         IPool aavePool = IPool(state.poolAddressesProvider.getPool());
         IERC20Upgradeable collateralToken = IERC20Upgradeable(IRangeProtocolVault(address(this)).collateralToken());
-        collateralToken.approve(address(aavePool), supplyAmount);
+        collateralToken.safeApprove(address(aavePool), 0);
+        collateralToken.safeApprove(address(aavePool), supplyAmount);
         aavePool.supply(address(collateralToken), supplyAmount, address(this), 0);
         emit CollateralSupplied(address(collateralToken), supplyAmount);
     }

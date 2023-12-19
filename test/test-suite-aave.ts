@@ -16,15 +16,15 @@ const MAX_UINT = bn(
   "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 );
 
-describe("Test suite for Aave", () => {
+describe.only("Test suite for Aave", () => {
   before(async () => {
     const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
     const ghoDebtAddress = "0x786dbff3f1292ae8f92ea68cf93c30b34b1ed04b";
-    const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const USDC = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
     const aUSDC = "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c";
     const poolAddressesProvider = "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e";
     const collateralTokenPriceFeed =
-      "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6";
+      "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D";
     const ghoPriceFeed = "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC";
 
     [manager] = await ethers.getSigners();

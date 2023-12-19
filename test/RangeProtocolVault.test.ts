@@ -42,11 +42,11 @@ let initializeData: any;
 const lowerTick = -276420;
 const upperTick = -276180;
 const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
-const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const USDC = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 const MAX_UINT256 =
   "115792089237316195423570985008687907853269984665640564039457584007913129639935";
 
-describe("RangeProtocolVault", () => {
+describe.only("RangeProtocolVault", () => {
   before(async () => {
     [manager, nonManager, user2, newManager] = await ethers.getSigners();
     uniV3Factory = await ethers.getContractAt(
@@ -75,7 +75,7 @@ describe("RangeProtocolVault", () => {
       symbol,
       gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
       poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
-      collateralTokenPriceFeed: "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+      collateralTokenPriceFeed: "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
       collateralPriceOracleHeartbeat: 86400,
       ghoPriceFeed: "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
       ghoPriceOracleHeartbeat: 86400,
@@ -114,7 +114,7 @@ describe("RangeProtocolVault", () => {
     );
     await setStorageAt(
       USDC,
-      "0xcb8911fb82c2d10f6cf1d31d1e521ad3f4e3f42615f6ba67c454a9a2fdb9b6a7",
+      "0xbc40fbf4394cd00f78fae9763b0c2c71b21ea442c42fdadc5b720537240ebac1",
       usdcAmount
     );
 
@@ -132,6 +132,7 @@ describe("RangeProtocolVault", () => {
   });
 
   beforeEach(async () => {
+    await token1.approve(vault.address, 0);
     await token1.approve(vault.address, collateralAmount.mul(bn(2)));
   });
 
@@ -360,6 +361,7 @@ describe("RangeProtocolVault", () => {
     });
 
     it("supply collateral", async () => {
+      await token1.approve(vault.address, 0);
       await token1.approve(vault.address, collateralAmount.mul(bn(10)));
       const shares = collateralAmount
         .mul(await vault.totalSupply())
@@ -568,6 +570,7 @@ describe("RangeProtocolVault", () => {
 
   describe("Fee collection", () => {
     before(async () => {
+      await token1.approve(vault.address, 0);
       await token1.approve(vault.address, collateralAmount);
       const shares = collateralAmount
         .mul(await vault.totalSupply())
